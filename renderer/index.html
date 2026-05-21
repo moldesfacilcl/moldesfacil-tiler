@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moldes Fácil — Tiler Plotter → A4</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- pdfjs para renderizar preview del PDF (sin rasterizar el output final) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <header class="app-header">
+    <div class="header-brand">
+      <span class="header-logo">✂</span>
+      <div>
+        <span class="header-title">Moldes Fácil</span>
+        <span class="header-subtitle">Tiler Plotter → A4</span>
+      </div>
+    </div>
+    <div class="header-hint" id="headerHint">
+      Arrastrá PDFs o carpetas para empezar
+    </div>
+    <button id="btnLogout" title="Cerrar sesión" style="-webkit-app-region:no-drag;background:rgba(255,255,255,0.15);border:none;color:#fff;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+      Cerrar sesión
+    </button>
+  </header>
+
+  <!-- Modal de advertencia de inactividad -->
+  <div id="inactivityModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;padding:32px 36px;max-width:340px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+      <div style="font-size:36px;margin-bottom:12px;">⏰</div>
+      <p style="font-weight:700;font-size:16px;margin-bottom:8px;">¿Seguís ahí?</p>
+      <p style="font-size:13px;color:#666;margin-bottom:24px;">La sesión se cerrará en <b id="inactivityCountdown">60</b> segundos por inactividad.</p>
+      <button id="btnStayActive" style="background:#5b3cdc;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;width:100%;">
+        Continuar sesión
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Contenido principal ────────────────────────────────────────────── -->
+  <main class="app-main">
+
+    <!-- Panel izquierdo: drop zone + lista de archivos -->
+    <section class="panel panel-left">
+
+      <!-- Zona superior: drop zone + miniatura del plotter -->
+      <div class="top-zone">
+
+        <!-- Drop zone -->
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-icon">📂</div>
+          <p class="drop-primary">Arrastrá la carpeta de moldes aquí</p>
+          <p class="drop-secondary">O usá el botón para buscarla en tu computadora</p>
+          <button class="btn btn-outline" id="btnSelectInputFolder">
+            📁 Seleccionar carpeta de moldes
+          </button>
+          <button class="btn btn-ghost btn-sm" id="btnSelectFiles" style="margin-top:6px;font-size:12px">
+            o elegir archivos individuales
+          </button>
+          <input type="file" id="fileInput" accept=".pdf" multiple style="display:none" />
+
+          <!-- Overlay de carga (visible mientras se leen archivos desde disco/Drive) -->
+          <div id="dropZoneLoading" style="display:none; position:absolute; inset:0; background:rgba(255,255,255,0.88); border-radius:inherit; display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; z-index:10;">
+            <div class="preview-spinner"></div>
+            <p id="dropZoneLoadingMsg" style="font-size:13px; color:#555; margin:0; font-weight:500;">Leyendo archivos…</p>
+            <div style="width:200px; height:6px; background:#e0e0e0; border-radius:3px; overflow:hidden;">
+              <div id="dropZoneProgressBar" style="height:100%; width:0%; background:#4a7aff; border-radius:3px; transition:width 0.3s ease;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel miniatura del plotter -->
+        <div class="plotter-thumb-panel" id="plotterThumbPanel">
+          <div class="thumb-panel-header">
+            <span class="thumb-panel-title">Vista plotter</span>
+            <div class="thumb-nav" id="thumbNav" style="display:none">
+              <button class="thumb-nav-btn" id="btnThumbPrev">‹</button>
+              <span class="thumb-nav-label" id="thumbNavLabel">1/1</span>
+              <button class="thumb-nav-btn" id="btnThumbNext">›</button>
+            </div>
+          </div>
+          <div class="thumb-canvas-area" id="thumbCanvasArea">
+            <div class="thumb-canvas-wrap" id="thumbCanvasWrap">
+              <canvas id="thumbCanvas"></canvas>
+              <canvas id="thumbGridCanvas" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
+            </div>
+            <div class="thumb-placeholder" id="thumbPlaceholder">
+              <div class="thumb-placeholder-icon">📐</div>
+              <p>Cargá un archivo<br>para previsualizar</p>
+            </div>
+            <div class="thumb-loading" id="thumbLoading" style="display:none">
+              <div class="preview-spinner"></div>
+            </div>
+          </div>
+          <div class="thumb-info" id="thumbInfo"></div>
+          <div class="thumb-legend">
+            <span class="thumb-legend-a4">━ A4</span>
+            <span class="thumb-legend-letter">━ Carta</span>
+          </div>
+        </div>
+
+      </div><!-- /.top-zone -->
+
+      <!-- Tabla de archivos -->
+      <div class="file-section" id="fileSection" style="display:none">
+
+        <div class="file-section-header">
+          <h2 class="section-title">Archivos cargados</h2>
+          <div class="file-header-actions">
+            <button class="btn btn-smart btn-sm" id="btnBatchAutoAdjust" title="Auto-ajusta el grid para todos los archivos cargados y guarda los ajustes automáticamente">
+              ✨ AutoAjustar todos
+            </button>
+            <button class="btn btn-ghost btn-sm" id="btnClearAll">Limpiar todo</button>
+          </div>
+        </div>
+
+        <div class="file-table-wrapper">
+          <table class="file-table">
+            <thead>
+              <tr>
+                <th class="th-chk"><input type="checkbox" id="chkSelectAll" title="Seleccionar todos" /></th>
+                <th>Archivo</th>
+                <th>Dimensiones</th>
+                <th id="thGridLabel">Grid A4</th>
+                <th>Peso</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="fileTableBody">
+              <!-- filas dinámicas -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="file-summary" id="fileSummary"></div>
+      </div>
+
+    </section>
+
+    <!-- Panel derecho: configuración + acción -->
+    <section class="panel panel-right">
+
+      <h2 class="section-title">Configuración</h2>
+
+      <!-- Formato de hoja de salida -->
+      <div class="config-group">
+        <label class="config-label">Formato de hoja de salida</label>
+        <label class="toggle-row">
+          <input type="checkbox" id="chkFormatA4" checked />
+          <span class="toggle-label">
+            <span class="format-badge">A4</span>
+            <span class="format-dims">210 × 297 mm</span>
+          </span>
+        </label>
+        <label class="toggle-row">
+          <input type="checkbox" id="chkFormatLetter" />
+          <span class="toggle-label">
+            <span class="format-badge">Carta</span>
+            <span class="format-dims">215.9 × 279.4 mm</span>
+          </span>
+        </label>
+        <label class="toggle-row">
+          <input type="checkbox" id="chkFormatPlotter" />
+          <span class="toggle-label">
+            <span class="format-badge">Plotter</span>
+            <span class="format-dims">Archivo original sin procesar</span>
+          </span>
+        </label>
+        <p class="config-hint">El patrón se divide en hojas exactas a escala 1:1, sin reescalado. Podés generar ambos formatos a la vez.</p>
+      </div>
+
+      <!-- Marcas y etiquetas -->
+      <div class="config-group">
+        <label class="config-label">Marcas de ensamblaje</label>
+        <label class="toggle-row">
+          <input type="checkbox" id="chkMarks" checked />
+          <span class="toggle-label">Cruces de registro en esquinas</span>
+        </label>
+        <label class="toggle-row">
+          <input type="checkbox" id="chkLabels" checked />
+          <span class="toggle-label">Etiquetas de cuadrícula (A1, B2…)</span>
+        </label>
+        <p class="config-hint">Las marcas se ubican en los márgenes, fuera del área del patrón.</p>
+      </div>
+
+      <!-- Omitir archivos ya exportados -->
+      <div class="config-group">
+        <label class="config-label">Opciones de procesamiento</label>
+        <label class="toggle-row">
+          <input type="checkbox" id="chkSkipExisting" />
+          <span class="toggle-label">Omitir archivos ya exportados</span>
+        </label>
+        <p class="config-hint">Si el PDF de salida ya existe en la carpeta destino, no lo regenera. Útil para reanudar lotes interrumpidos.</p>
+      </div>
+
+      <!-- Carpeta de destino -->
+      <div class="config-group">
+        <label class="config-label">Carpeta de destino</label>
+        <div class="folder-row">
+          <span class="folder-path" id="folderPath">Sin seleccionar</span>
+          <button class="btn btn-outline btn-sm" id="btnSelectFolder">Elegir…</button>
+        </div>
+        <p class="config-hint" id="destFormatHint">Los PDFs se guardan como <em id="destFormatName">nombre_A4.pdf</em> en la carpeta elegida.</p>
+      </div>
+
+      <!-- Botones de acción -->
+      <div class="action-section">
+        <button class="btn btn-primary btn-lg" id="btnProcess" disabled>
+          <span id="btnProcessText">⬇ Descargar seleccionados</span>
+        </button>
+        <button class="btn btn-outline btn-lg" id="btnProcessAll" disabled>
+          ⬇ Descargar todos
+        </button>
+
+        <!-- Panel conexión con sitio web -->
+        <div id="uploadPanel" style="margin-top:12px;">
+          <div class="config-group">
+            <input type="text"     id="apiUrl"   style="display:none;" />
+            <input type="password" id="apiToken" style="display:none;" />
+            <button id="btnUploadToSite" class="btn-primary" style="width:100%;">
+              ☁️ Cargar al sitio
+            </button>
+            <div id="uploadStatus" style="margin-top:8px; font-size:12px; color:#666;"></div>
+            <button id="btnRetryErrors" style="display:none;margin-top:8px;width:100%;padding:7px;border:1.5px solid #e67e22;background:#fff;color:#e67e22;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+              🔁 Reintentar archivos con error
+            </button>
+            <button id="btnDownloadErrorLog" style="display:none;margin-top:6px;width:100%;padding:7px;border:1.5px solid #c0392b;background:#fff;color:#c0392b;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+              ⬇️ Descargar reporte de errores
+            </button>
+          </div>
+
+          <!-- Historial de cargas -->
+          <details id="historyPanel" style="margin-top:10px;">
+            <summary style="font-size:12px;font-weight:600;color:#5b3cdc;cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:4px;">
+              <span id="historyArrow" style="transition:transform .2s;display:inline-block;">▶</span>
+              📋 Historial de cargas
+            </summary>
+            <div id="historyList" style="margin-top:8px;font-size:11px;color:#555;max-height:180px;overflow-y:auto;border-top:1px solid #eee;padding-top:6px;"></div>
+          </details>
+        </div>
+
+        <p class="action-hint" id="actionHint">Cargá al menos un PDF para continuar</p>
+      </div>
+
+      <!-- Barra de progreso -->
+      <div class="progress-section" id="progressSection" style="display:none">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <p class="progress-label" id="progressLabel">Preparando…</p>
+      </div>
+
+      <!-- Resultados -->
+      <div class="results-section" id="resultsSection" style="display:none">
+        <div class="results-header">
+          <span class="results-icon" id="resultsIcon">✅</span>
+          <span class="results-title" id="resultsTitle">Proceso completado</span>
+        </div>
+        <div class="results-list" id="resultsList"></div>
+        <button class="btn btn-outline btn-sm" id="btnOpenFolder" style="display:none">
+          Abrir carpeta de destino
+        </button>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ── Modal de previsualización ──────────────────────────────────────── -->
+  <div class="preview-overlay" id="previewOverlay" style="display:none">
+    <div class="preview-modal">
+
+      <!-- Header del modal -->
+      <div class="preview-modal-header">
+        <div class="preview-modal-title">
+          <span class="preview-title-icon">🔍</span>
+          <span id="previewFileName">Previsualización</span>
+        </div>
+        <div class="preview-controls">
+          <button class="btn btn-ghost btn-sm" id="btnZoomOut" title="Reducir">−</button>
+          <span class="zoom-level" id="zoomLabel">100%</span>
+          <button class="btn btn-ghost btn-sm" id="btnZoomIn"  title="Ampliar">+</button>
+          <button class="btn btn-ghost btn-sm" id="btnZoomFit" title="Ajustar">↔</button>
+          <button class="preview-close-btn" id="btnClosePreview" title="Cerrar">✕</button>
+        </div>
+      </div>
+
+      <!-- Info del grid + sliders de ajuste en tiempo real -->
+      <div class="preview-grid-info" id="previewGridInfo">
+        <span class="preview-format-toggle">
+          <button class="fmt-btn active" id="previewFmtA4">A4</button>
+          <button class="fmt-btn" id="previewFmtLetter">Carta</button>
+        </span>
+        <span id="previewGridText"></span>
+        <span class="preview-sliders">
+          <span class="preview-slider-item">
+            ↔
+            <input type="range" id="previewSliderX" min="0" max="200" value="0" step="1" style="width:90px;vertical-align:middle" />
+            <span id="previewValX" class="slider-value-sm">0 mm</span>
+          </span>
+          <span class="preview-slider-item">
+            ↕
+            <input type="range" id="previewSliderY" min="0" max="290" value="0" step="1" style="width:90px;vertical-align:middle" />
+            <span id="previewValY" class="slider-value-sm">0 mm</span>
+          </span>
+          <span class="preview-slider-hint">Ajustá los bordes de tile para evitar zonas críticas</span>
+          <button class="btn-auto-adjust" id="btnAutoAdjust" title="Detecta automáticamente el mejor offset del grid">
+            ✨ Auto-ajustar
+          </button>
+        </span>
+      </div>
+
+      <!-- Área de canvas con scroll -->
+      <div class="preview-canvas-area" id="previewCanvasArea">
+        <div class="preview-canvas-wrapper" id="previewCanvasWrapper">
+          <canvas id="previewCanvas"></canvas>
+          <!-- Grid overlay con etiquetas (divs absolutos) -->
+          <div class="preview-grid-overlay" id="previewGridOverlay"></div>
+        </div>
+        <!-- Spinner mientras carga -->
+        <div class="preview-loading" id="previewLoading">
+          <div class="preview-spinner"></div>
+          <p>Renderizando patrón…</p>
+        </div>
+      </div>
+
+      <!-- Footer: guardar ajuste -->
+      <div class="preview-footer">
+        <span class="preview-padding-info" id="previewPaddingInfo">Ajuste actual: 0 mm × 0 mm</span>
+        <button class="btn btn-primary btn-sm" id="btnSaveAdjust">
+          💾 Guardar ajuste para este molde
+        </button>
+      </div>
+
+      <p class="preview-hint">Usá Cmd+Shift+4 para tomar captura de pantalla y compartir con tus clientas</p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

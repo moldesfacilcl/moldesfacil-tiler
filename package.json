@@ -1,0 +1,60 @@
+{
+  "name": "moldesfacil-tiler",
+  "version": "1.0.0",
+  "description": "Convierte PDFs plotter a hojas A4 para impresión doméstica — Moldes Fácil",
+  "main": "main.js",
+  "scripts": {
+    "start": "env -u ELECTRON_RUN_AS_NODE NODE_ENV=development electron .",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1050.0",
+    "googleapis": "^172.0.0",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^26.0.12",
+    "electron-reload": "^2.0.0-alpha.1"
+  },
+  "build": {
+    "appId": "cl.moldesfacil.tiler",
+    "productName": "Moldes Fácil Tiler",
+    "copyright": "Copyright © 2026 Moldes Fácil",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "tiler/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "author": "Moldes Fácil",
+  "license": "ISC"
+}

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moldes Fácil — Tiler</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand: #5b3cdc;
+      --brand-dark: #3f2aaa;
+      --bg: #f4f4f8;
+      --surface: #ffffff;
+      --border: #e0e0ea;
+      --text: #1a1a2e;
+      --text-muted: #6b6b80;
+      --error: #ef4444;
+      --radius: 10px;
+    }
+    html, body {
+      height: 100%; margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      -webkit-app-region: drag;
+    }
+    .card {
+      background: var(--surface);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.12);
+      padding: 48px 40px 40px;
+      width: 340px;
+      -webkit-app-region: no-drag;
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .logo-icon { font-size: 44px; line-height: 1; }
+    .logo-title {
+      font-size: 20px; font-weight: 700;
+      color: var(--brand); margin-top: 10px;
+    }
+    .logo-sub {
+      font-size: 12px; color: var(--text-muted); margin-top: 4px;
+    }
+    label {
+      display: block; font-size: 13px; font-weight: 600;
+      color: var(--text); margin-bottom: 8px;
+    }
+    input[type="password"] {
+      width: 100%; padding: 10px 14px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 14px; color: var(--text);
+      outline: none; transition: border-color .15s;
+    }
+    input[type="password"]:focus { border-color: var(--brand); }
+    input[type="password"].error { border-color: var(--error); }
+    .error-msg {
+      font-size: 12px; color: var(--error);
+      margin-top: 6px; min-height: 16px;
+    }
+    button {
+      width: 100%; margin-top: 20px;
+      padding: 12px; border: none; border-radius: 8px;
+      background: var(--brand); color: #fff;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: background .15s;
+    }
+    button:hover  { background: var(--brand-dark); }
+    button:active { opacity: .85; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">✂️</div>
+      <div class="logo-title">Moldes Fácil Tiler</div>
+      <div class="logo-sub">Herramienta interna de producción</div>
+    </div>
+
+    <label for="emailInput">Correo electrónico</label>
+    <input type="email" id="emailInput" placeholder="correo@moldesfacil.cl" autocomplete="email" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;color:var(--text);outline:none;transition:border-color .15s;margin-bottom:16px;" />
+
+    <label for="keyInput">Clave de acceso</label>
+    <div style="position:relative;">
+      <input type="password" id="keyInput" placeholder="Ingresá la clave" autocomplete="current-password" style="padding-right:40px;" />
+      <button id="btnTogglePass" type="button" tabindex="-1" title="Mostrar/ocultar clave"
+        style="position:absolute;right:0;top:0;bottom:0;width:38px;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;display:flex;align-items:center;justify-content:center;margin-top:0;padding:0;">
+        👁
+      </button>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-weight:400;font-size:13px;color:var(--text-muted);margin-top:10px;cursor:pointer;">
+      <input type="checkbox" id="chkRemember" style="width:15px;height:15px;accent-color:var(--brand);cursor:pointer;" />
+      Recordar correo
+    </label>
+    <div class="error-msg" id="errorMsg"></div>
+    <button id="btnLogin">Ingresar</button>
+  </div>
+
+  <script>
+    const emailInput    = document.getElementById('emailInput');
+    const keyInput      = document.getElementById('keyInput');
+    const btnLogin      = document.getElementById('btnLogin');
+    const errorMsg      = document.getElementById('errorMsg');
+    const btnTogglePass = document.getElementById('btnTogglePass');
+    const chkRemember   = document.getElementById('chkRemember');
+
+    // Recuperar correo guardado al cargar
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+      emailInput.value    = savedEmail;
+      chkRemember.checked = true;
+      keyInput.focus();
+    }
+
+    btnTogglePass.addEventListener('click', () => {
+      const showing = keyInput.type === 'text';
+      keyInput.type = showing ? 'password' : 'text';
+      btnTogglePass.textContent = showing ? '👁' : '🙈';
+      keyInput.focus();
+    });
+
+    async function tryLogin() {
+      const email = emailInput.value.trim();
+      const key   = keyInput.value.trim();
+      if (!email || !key) return;
+
+      btnLogin.disabled = true;
+      btnLogin.textContent = 'Verificando…';
+      [emailInput, keyInput].forEach(el => el.classList.remove('error'));
+      errorMsg.textContent = '';
+
+      const result = await window.tilerAPI.verifyAccessKey(email, key);
+
+      if (!result.ok) {
+        [emailInput, keyInput].forEach(el => el.classList.add('error'));
+        errorMsg.textContent = 'Correo o clave incorrectos. Intentá de nuevo.';
+        btnLogin.disabled = false;
+        btnLogin.textContent = 'Ingresar';
+        keyInput.select();
+      } else {
+        // Guardar o borrar el correo según la preferencia
+        if (chkRemember.checked) {
+          localStorage.setItem('rememberedEmail', email);
+        } else {
+          localStorage.removeItem('rememberedEmail');
+        }
+      }
+      // Si ok: main.js navega a index.html automáticamente
+    }
+
+    btnLogin.addEventListener('click', tryLogin);
+    keyInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+    emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') keyInput.focus(); });
+    emailInput.focus();
+  </script>
+</body>
+</html>

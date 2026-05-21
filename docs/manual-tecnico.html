@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Moldes Fácil Tiler — Documentación Técnica</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --brand:      #5b3cdc;
+    --brand-light:#ede9ff;
+    --accent:     #4a7aff;
+    --text:       #1a1a2e;
+    --muted:      #6b6b80;
+    --border:     #e0e0ea;
+    --bg:         #f7f7fb;
+    --ok:         #16a34a;
+    --warn:       #b45309;
+    --danger:     #c0392b;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    background: #fff;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
+
+  /* ── Portada ── */
+  .cover {
+    text-align: center;
+    padding: 60px 0 48px;
+    border-bottom: 2px solid var(--brand);
+    margin-bottom: 48px;
+  }
+  .cover-icon  { font-size: 56px; line-height: 1; margin-bottom: 16px; }
+  .cover-title { font-size: 28px; font-weight: 800; color: var(--brand); margin-bottom: 4px; }
+  .cover-sub   { font-size: 15px; color: var(--muted); margin-bottom: 24px; }
+  .cover-meta  { font-size: 12px; color: var(--muted); }
+  .cover-meta span { margin: 0 10px; }
+
+  /* ── Índice ── */
+  .toc { background: var(--bg); border-radius: 10px; padding: 24px 28px; margin-bottom: 48px; }
+  .toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 12px; }
+  .toc ol  { padding-left: 18px; }
+  .toc li  { margin: 4px 0; }
+  .toc a   { color: var(--brand); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* ── Secciones ── */
+  h1 { font-size: 20px; font-weight: 800; color: var(--brand); margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 2px solid var(--brand-light); }
+  h2 { font-size: 15px; font-weight: 700; color: var(--text); margin: 28px 0 10px; }
+  h3 { font-size: 13px; font-weight: 700; color: var(--muted); margin: 18px 0 6px; text-transform: uppercase; letter-spacing: .06em; }
+  p  { margin: 8px 0; }
+
+  /* ── Tablas ── */
+  table  { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 12px; }
+  thead  { background: var(--brand); color: #fff; }
+  th     { padding: 8px 12px; text-align: left; font-weight: 600; }
+  td     { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: var(--bg); }
+
+  /* ── Código ── */
+  code   { font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--brand); }
+  pre    { background: #1a1a2e; color: #e2e8f0; border-radius: 8px; padding: 16px 20px; overflow-x: auto; margin: 12px 0; font-size: 11.5px; line-height: 1.7; }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+
+  /* ── Badges ── */
+  .badge        { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .badge-brand  { background: var(--brand-light); color: var(--brand); }
+  .badge-ok     { background: #dcfce7; color: var(--ok); }
+  .badge-warn   { background: #fef3cd; color: var(--warn); }
+  .badge-danger { background: #fee2e2; color: var(--danger); }
+
+  /* ── Callouts ── */
+  .callout      { border-radius: 8px; padding: 12px 16px; margin: 14px 0; font-size: 12px; }
+  .callout-info { background: var(--brand-light); border-left: 4px solid var(--brand); }
+  .callout-warn { background: #fef3cd; border-left: 4px solid #f59e0b; }
+  .callout-ok   { background: #dcfce7; border-left: 4px solid var(--ok); }
+
+  /* ── Pasos SOP ── */
+  .steps        { counter-reset: step; list-style: none; padding: 0; }
+  .steps li     { counter-increment: step; display: flex; gap: 14px; margin: 10px 0; align-items: flex-start; }
+  .steps li::before {
+    content: counter(step);
+    min-width: 24px; height: 24px;
+    background: var(--brand); color: #fff;
+    border-radius: 50%; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { padding: 0; max-width: 100%; }
+    h1   { page-break-before: always; }
+    .cover { page-break-after: always; }
+    pre, table { page-break-inside: avoid; }
+    a { color: var(--brand); text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     PORTADA
+═══════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-icon">✂️</div>
+  <div class="cover-title">Moldes Fácil Tiler</div>
+  <div class="cover-sub">Documentación Técnica — Manual de Operación y Stack Tecnológico</div>
+  <div>
+    <span class="badge badge-brand">v1.0</span>
+    &nbsp;
+    <span class="badge badge-ok">Producción</span>
+  </div>
+  <div class="cover-meta" style="margin-top:20px;">
+    <span>Proyecto: moldesfacil-tiler</span>
+    <span>·</span>
+    <span>Plataforma: macOS / Windows</span>
+    <span>·</span>
+    <span>Mayo 2026</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     ÍNDICE
+═══════════════════════════════════════════════ -->
+<div class="toc">
+  <h2>Índice de contenidos</h2>
+  <ol>
+    <li><a href="#descripcion">Descripción general</a></li>
+    <li><a href="#stack">Stack tecnológico</a></li>
+    <li><a href="#arquitectura">Arquitectura del sistema</a></li>
+    <li><a href="#funcionalidades">Funcionalidades</a></li>
+    <li><a href="#nombres">Convenciones de nombres de archivos</a></li>
+    <li><a href="#sop">SOPs — Procedimientos operativos estándar</a></li>
+    <li><a href="#sheets">Integración con Google Sheets</a></li>
+    <li><a href="#seguridad">Seguridad y acceso</a></li>
+    <li><a href="#infraestructura">Infraestructura en la nube</a></li>
+    <li><a href="#build">Build y distribución</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+  </ol>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     1. DESCRIPCIÓN GENERAL
+═══════════════════════════════════════════════ -->
+<h1 id="descripcion">1. Descripción general</h1>
+
+<p>
+  <strong>Moldes Fácil Tiler</strong> es una herramienta de escritorio de uso interno para el equipo de producción de <em>Moldes Fácil</em>. Su función principal es convertir archivos PDF de tamaño plotter (anchos y altos) en hojas del tamaño estándar que usan las clientas para imprimir en casa (A4 o Carta), y subirlos automáticamente al sitio web con la información correcta del catálogo.
+</p>
+
+<h2>Problema que resuelve</h2>
+<p>
+  Los moldes de costura se diseñan en formato plotter (ej.: 90×120 cm). Las clientas imprimen en hojas A4 o Carta que deben ensamblarse. El Tiler divide automáticamente el PDF grande en la cantidad exacta de hojas necesarias, manteniendo escala 1:1, y agrega marcas de registro y etiquetas de cuadrícula (A1, B2…) para facilitar el ensamblaje.
+</p>
+
+<h2>Flujo principal</h2>
+<ol class="steps">
+  <li>El operador arrastra las carpetas con PDFs plotter al programa.</li>
+  <li>La app detecta dimensiones y calcula el grid (ej.: 4×6 = 24 hojas A4).</li>
+  <li>El operador ajusta el offset del grid si es necesario (para evitar cortar zonas críticas del molde).</li>
+  <li>Hace clic en <strong>"Cargar al sitio"</strong>: la app tilea los PDFs, los sube a DigitalOcean Spaces y los asocia al producto correspondiente en el catálogo web.</li>
+  <li>Todo queda registrado automáticamente en Google Sheets.</li>
+</ol>
+
+<!-- ══════════════════════════════════════════════
+     2. STACK TECNOLÓGICO
+═══════════════════════════════════════════════ -->
+<h1 id="stack">2. Stack tecnológico</h1>
+
+<table>
+  <thead><tr><th>Capa</th><th>Tecnología</th><th>Versión</th><th>Función</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Runtime desktop</strong></td><td>Electron</td><td>28.3.3</td><td>Empaqueta la app como ejecutable nativo (Mac + Windows)</td></tr>
+    <tr><td><strong>UI</strong></td><td>HTML / CSS / JS vanilla</td><td>—</td><td>Interfaz sin frameworks (rendimiento máximo)</td></tr>
+    <tr><td><strong>Procesamiento PDF</strong></td><td>pdf-lib</td><td>1.x</td><td>Lee, divide y reensambla PDFs manteniendo vectores</td></tr>
+    <tr><td><strong>Preview PDF</strong></td><td>PDF.js (cdnjs)</td><td>3.11.174</td><td>Renderiza el PDF en canvas para previsualización</td></tr>
+    <tr><td><strong>Workers paralelos</strong></td><td>Node.js Worker Threads</td><td>—</td><td>Pool de 4 workers para procesar PDFs en paralelo</td></tr>
+    <tr><td><strong>Almacenamiento cloud</strong></td><td>DigitalOcean Spaces (S3)</td><td>—</td><td>CDN para los PDFs generados</td></tr>
+    <tr><td><strong>SDK S3</strong></td><td>@aws-sdk/client-s3</td><td>v3</td><td>Sube archivos a DigitalOcean Spaces</td></tr>
+    <tr><td><strong>API del catálogo</strong></td><td>REST API propia (NestJS)</td><td>—</td><td>Asocia los PDFs subidos al producto en el sitio</td></tr>
+    <tr><td><strong>Registros en la nube</strong></td><td>Google Sheets API v4</td><td>—</td><td>Log de operaciones: historial, errores, validaciones</td></tr>
+    <tr><td><strong>SDK Google</strong></td><td>googleapis</td><td>latest</td><td>Autenticación y escritura en Google Sheets</td></tr>
+    <tr><td><strong>Seguridad</strong></td><td>crypto (Node built-in)</td><td>—</td><td>Hash SHA-256 de contraseña, sin almacenar texto plano</td></tr>
+    <tr><td><strong>Build Windows</strong></td><td>GitHub Actions + electron-builder</td><td>—</td><td>Genera instalador .exe sin necesidad de Wine</td></tr>
+  </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════════
+     3. ARQUITECTURA
+═══════════════════════════════════════════════ -->
+<h1 id="arquitectura">3. Arquitectura del sistema</h1>
+
+<h2>Procesos de Electron</h2>
+<p>Electron divide la app en dos procesos separados que se comunican por IPC (Inter-Process Communication):</p>
+
+<table>
+  <thead><tr><th>Proceso</th><th>Archivo</th><th>Responsabilidad</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Main</strong></td><td><code>main.js</code></td><td>Acceso a disco, red, S3, Google Sheets, diálogos del sistema, worker pool</td></tr>
+    <tr><td><strong>Renderer</strong></td><td><code>renderer/app.js</code></td><td>UI, estado visual, interacción del usuario</td></tr>
+    <tr><td><strong>Preload</strong></td><td><code>preload.js</code></td><td>Puente seguro entre main y renderer (contextIsolation)</td></tr>
+    <tr><td><strong>Workers</strong></td><td><code>tiler/pdfWorker.js</code></td><td>Procesamiento pesado de PDFs (4 instancias en paralelo)</td></tr>
+  </tbody>
+</table>
+
+<h2>Archivos principales</h2>
+<pre><code>moldesfacil-tiler/
+├── main.js                  # Proceso principal (IPC handlers, S3, Sheets, auth)
+├── preload.js               # Bridge seguro main ↔ renderer
+├── sheets-sync.js           # Módulo de sincronización con Google Sheets
+├── config/
+│   └── gsheets-credentials.json   # Service account key (NO versionar públicamente)
+├── tiler/
+│   ├── pdfWorker.js         # Worker: detect / tile / tile-to-buffer
+│   ├── pdfTilerEngine.js    # Motor de tiling con pdf-lib
+│   └── workerPool.js        # Pool de N workers con cola de tareas
+├── renderer/
+│   ├── index.html           # UI principal
+│   ├── login.html           # Pantalla de login
+│   ├── app.js               # Lógica del renderer
+│   └── styles.css           # Estilos
+└── .github/
+    └── workflows/
+        └── build-win.yml    # Build automático para Windows</code></pre>
+
+<h2>Flujo de datos — proceso-y-sube</h2>
+<pre><code>Renderer (app.js)
+  │  processAndUpload({ files, formats })
+  ▼
+Main (main.js) — handler 'process-and-upload'
+  │
+  ├─► Worker Pool (4 workers en paralelo)
+  │     pdfWorker.js: tile-to-buffer
+  │     → lee PDF del disco
+  │     → divide en hojas (pdf-lib)
+  │     → devuelve bytes en memoria (Transferable)
+  │
+  ├─► S3Client → DigitalOcean Spaces
+  │     PUT pdfs/{code}-{talla}-{tipo}-{timestamp}.pdf
+  │
+  ├─► API REST (NestJS) → POST /molds/upload-pdf
+  │     Asocia el PDF al producto en el catálogo
+  │
+  ├─► upload-history.json (local userData)
+  │     Persiste el historial offline
+  │
+  └─► Google Sheets API
+        Historial / Errores / Validación</code></pre>
+
+<!-- ══════════════════════════════════════════════
+     4. FUNCIONALIDADES
+═══════════════════════════════════════════════ -->
+<h1 id="funcionalidades">4. Funcionalidades</h1>
+
+<table>
+  <thead><tr><th>Funcionalidad</th><th>Descripción</th><th>Estado</th></tr></thead>
+  <tbody>
+    <tr><td>Tiling A4 / Carta / Plotter</td><td>Divide PDFs plotter en hojas estándar, escala 1:1</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Marcas de registro</td><td>Cruces en esquinas para alinear hojas al ensamblar</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Etiquetas de cuadrícula</td><td>Identificadores A1, B2… en cada hoja</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Ajuste de offset de grid</td><td>Sliders para desplazar el grid y evitar cortes críticos</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Auto-ajuste (Sobel)</td><td>Detecta automáticamente el mejor offset usando detección de bordes</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Auto-ajuste masivo</td><td>Auto-ajusta todos los archivos del lote de una vez</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Vista previa interactiva</td><td>Canvas con zoom, grid superpuesto, ajuste en tiempo real</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Procesamiento paralelo</td><td>Pool de 4 workers simultáneos (aprovecha multi-core)</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Subida a DigitalOcean</td><td>Tilea + sube en un solo paso, sin carpeta intermedia</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Descarga local</td><td>Guarda PDFs tileados en carpeta elegida por el usuario</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Validación de códigos</td><td>Verifica que el código del molde exista en el catálogo antes de subir</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Retry de errores</td><td>Botón para reintentar solo los archivos que fallaron</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Reporte de errores</td><td>Descarga .txt con detalle de todos los errores de la sesión</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Historial de cargas</td><td>Panel colapsable con últimas 20 sesiones y estado de sync</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Google Sheets</td><td>Log en la nube con soporte offline y auto-sincronización</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Login con email y clave</td><td>Autenticación con hash SHA-256, sin texto plano</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Sesión persistente</td><td>Recuerda la sesión por 30 días</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Timeout de inactividad</td><td>Cierra sesión tras 15 min inactivo, con aviso de 60 s</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Notificación del sistema</td><td>Notificación OS al completar cada carga</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Build para Windows</td><td>GitHub Actions genera instalador .exe automáticamente</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+    <tr><td>Omitir ya exportados</td><td>Opción para saltear archivos ya procesados en lotes interrumpidos</td><td><span class="badge badge-ok">✓ Activo</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════════
+     5. CONVENCIONES DE NOMBRES
+═══════════════════════════════════════════════ -->
+<h1 id="nombres">5. Convenciones de nombres de archivos</h1>
+
+<p>La app soporta dos formatos de nombre para los PDFs de entrada:</p>
+
+<h2>Formato A — Talla prefijo</h2>
+<pre><code>{talla_prefijo} molde {código}.pdf
+
+Ejemplos:
+  T-14 molde 569.pdf    →  código: 569,  talla: 14
+  T-12 molde 443A.pdf   →  código: 443A, talla: 12</code></pre>
+
+<h2>Formato B — Código prefijo</h2>
+<pre><code>{código} TALLA {talla}.pdf
+
+Ejemplos:
+  370A TALLA L.pdf      →  código: 370A, talla: L
+  684 TALLA M.pdf       →  código: 684,  talla: M</code></pre>
+
+<h2>Archivos de salida (tileados)</h2>
+<pre><code>{nombre_original} A4.pdf
+{nombre_original} Carta.pdf
+{nombre_original} Plotter.pdf
+
+Ejemplo de salida:
+  T-14 molde 569 A4.pdf
+  T-14 molde 569 Carta.pdf</code></pre>
+
+<div class="callout callout-warn">
+  <strong>⚠ Importante:</strong> Los archivos cuyo nombre no coincida con ninguno de los dos formatos mostrarán la etiqueta <em>"sin código"</em> en la tabla y <strong>no podrán subirse al sitio web</strong>. Verificar los nombres antes de procesar lotes grandes.
+</div>
+
+<!-- ══════════════════════════════════════════════
+     6. SOPs
+═══════════════════════════════════════════════ -->
+<h1 id="sop">6. SOPs — Procedimientos operativos estándar</h1>
+
+<h2>SOP-01 — Iniciar sesión</h2>
+<ol class="steps">
+  <li>Abrir la aplicación <strong>Moldes Fácil Tiler</strong>.</li>
+  <li>Ingresar el correo: <code>info@moldesfacil.cl</code></li>
+  <li>Ingresar la clave de acceso y hacer clic en <strong>"Ingresar"</strong>.</li>
+  <li>La sesión se recuerda por <strong>30 días</strong>. No es necesario repetir este paso en cada uso.</li>
+</ol>
+
+<h2>SOP-02 — Cargar moldes al sitio web (flujo principal)</h2>
+<ol class="steps">
+  <li>Arrastrar la carpeta de moldes a la zona de drop, o usar <strong>"Seleccionar carpeta de moldes"</strong>. Se pueden seleccionar múltiples carpetas a la vez.</li>
+  <li>Esperar a que la app detecte las dimensiones de cada archivo (indicador de progreso).</li>
+  <li>Verificar los badges de validación junto a cada archivo:
+    <br><span class="badge badge-ok">✓</span> verde = código encontrado en el catálogo
+    <br><span class="badge badge-warn">⚠</span> amarillo = sin código (nombre no reconocido)
+    <br><span style="color:#dc2626;">✗</span> rojo = código no encontrado en el catálogo</li>
+  <li>Seleccionar los formatos a generar: <strong>A4</strong>, <strong>Carta</strong> y/o <strong>Plotter</strong>.</li>
+  <li>Hacer clic en <strong>"Cargar al sitio"</strong>.</li>
+  <li>Esperar a que el progreso llegue al 100%. La barra muestra archivo por archivo.</li>
+  <li>Al terminar aparece el resumen: archivos subidos OK y errores (si los hay).</li>
+  <li>Si hay errores, usar el botón <strong>"Reintentar archivos con error"</strong> o descargar el reporte .txt.</li>
+</ol>
+
+<h2>SOP-03 — Ajustar el grid de un molde</h2>
+<ol class="steps">
+  <li>En la tabla de archivos, hacer clic en el botón <strong>"👁 A4"</strong> o <strong>"👁 Carta"</strong> del archivo a ajustar.</li>
+  <li>En el modal de previsualización, usar los sliders <strong>↔</strong> (horizontal) y <strong>↕</strong> (vertical) para desplazar el grid.</li>
+  <li>Alternativamente, hacer clic en <strong>"✨ Auto-ajustar"</strong> para que la app detecte automáticamente el mejor offset.</li>
+  <li>Una vez conforme, hacer clic en <strong>"💾 Guardar ajuste para este molde"</strong>.</li>
+  <li>Repetir para cada formato (A4 / Carta) si es necesario.</li>
+</ol>
+
+<h2>SOP-04 — Descargar PDFs localmente (sin subir al sitio)</h2>
+<ol class="steps">
+  <li>Cargar los archivos siguiendo SOP-02 pasos 1–4.</li>
+  <li>Seleccionar una <strong>carpeta de destino</strong> con el botón "Elegir…".</li>
+  <li>Usar <strong>"⬇ Descargar seleccionados"</strong> o <strong>"⬇ Descargar todos"</strong>.</li>
+  <li>Los PDFs se guardan en subcarpetas por formato: <code>NombreCarpeta A4/</code>, <code>NombreCarpeta Carta/</code>.</li>
+</ol>
+
+<h2>SOP-05 — Cerrar sesión</h2>
+<p>Hacer clic en el botón <strong>"Cerrar sesión"</strong> en la esquina superior derecha. La sesión también se cierra automáticamente tras 15 minutos de inactividad (con aviso de 60 segundos previo).</p>
+
+<h2>SOP-06 — Revisar historial de cargas</h2>
+<ol class="steps">
+  <li>En el panel derecho, expandir <strong>"📋 Historial de cargas"</strong>.</li>
+  <li>Ver las últimas 20 sesiones con fecha, hora, archivos subidos y errores.</li>
+  <li>Si aparece el indicador <strong>"⏳ registros pendientes"</strong>, hacer clic en <strong>"Sincronizar ahora"</strong> para enviar los datos pendientes a Google Sheets.</li>
+</ol>
+
+<!-- ══════════════════════════════════════════════
+     7. GOOGLE SHEETS
+═══════════════════════════════════════════════ -->
+<h1 id="sheets">7. Integración con Google Sheets</h1>
+
+<h2>Spreadsheet</h2>
+<p>
+  Nombre: <strong>Moldes Fácil — Registro Tiler</strong><br>
+  ID: <code>1bVJ0rbMzYF1bHbbRdT8HBBRh7w3kw5sykvVM3SDyt0M</code><br>
+  Acceso: <a href="https://docs.google.com/spreadsheets/d/1bVJ0rbMzYF1bHbbRdT8HBBRh7w3kw5sykvVM3SDyt0M/edit">Ver en Google Sheets</a>
+</p>
+
+<h2>Pestañas y columnas</h2>
+
+<h3>Historial</h3>
+<table>
+  <thead><tr><th>Fecha</th><th>Hora</th><th>Subidos OK</th><th>Con error</th><th>Formatos</th><th>Archivos</th></tr></thead>
+  <tbody><tr><td colspan="6" style="color:var(--muted);font-style:italic;">Una fila por sesión de carga completa</td></tr></tbody>
+</table>
+
+<h3>Errores</h3>
+<table>
+  <thead><tr><th>Fecha</th><th>Hora</th><th>Archivo</th><th>Código</th><th>Talla</th><th>Formato</th><th>Error</th></tr></thead>
+  <tbody><tr><td colspan="7" style="color:var(--muted);font-style:italic;">Una fila por cada archivo que falló en la subida</td></tr></tbody>
+</table>
+
+<h3>Validación</h3>
+<table>
+  <thead><tr><th>Fecha</th><th>Hora</th><th>Código</th><th>Estado</th></tr></thead>
+  <tbody><tr><td colspan="4" style="color:var(--muted);font-style:italic;">Una fila por cada código verificado contra el catálogo</td></tr></tbody>
+</table>
+
+<h2>Comportamiento offline</h2>
+<p>Si no hay conexión a internet al momento de la operación:</p>
+<ul style="padding-left:18px;margin:8px 0;">
+  <li>Los datos se guardan localmente en <code>sheets-queue.json</code> (carpeta de datos del usuario).</li>
+  <li>Al recuperar la conexión, la app sincroniza automáticamente (intento cada 5 minutos).</li>
+  <li>También se puede sincronizar manualmente desde el panel de historial.</li>
+</ul>
+
+<h2>Service Account</h2>
+<p>
+  Email: <code>id-tiler-sync@moldesfacil-tiler.iam.gserviceaccount.com</code><br>
+  Proyecto GCP: <code>moldesfacil-tiler</code><br>
+  Credenciales: <code>config/gsheets-credentials.json</code> (dentro del proyecto, no publicar)
+</p>
+
+<!-- ══════════════════════════════════════════════
+     8. SEGURIDAD
+═══════════════════════════════════════════════ -->
+<h1 id="seguridad">8. Seguridad y acceso</h1>
+
+<table>
+  <thead><tr><th>Aspecto</th><th>Implementación</th></tr></thead>
+  <tbody>
+    <tr><td>Contraseña</td><td>Hash SHA-256. Nunca se guarda en texto plano</td></tr>
+    <tr><td>Sesión</td><td>Token hash en <code>session.json</code>, expira en 30 días</td></tr>
+    <tr><td>Inactividad</td><td>Cierre automático tras 15 min, con advertencia a los 60 s</td></tr>
+    <tr><td>Context Isolation</td><td>Electron con <code>contextIsolation: true</code> y <code>nodeIntegration: false</code></td></tr>
+    <tr><td>Credenciales API</td><td>Hardcodeadas en el binario compilado, no expuestas en la UI</td></tr>
+    <tr><td>Credenciales S3</td><td>Incluidas en el ejecutable, no visibles para el usuario final</td></tr>
+  </tbody>
+</table>
+
+<h2>Credenciales de acceso</h2>
+<table>
+  <thead><tr><th>Dato</th><th>Valor</th></tr></thead>
+  <tbody>
+    <tr><td>Email de acceso</td><td><code>info@moldesfacil.cl</code></td></tr>
+    <tr><td>Clave</td><td>Confidencial — gestionada por el administrador</td></tr>
+    <tr><td>Sesión máxima</td><td>30 días desde el último login</td></tr>
+    <tr><td>Timeout inactividad</td><td>15 minutos</td></tr>
+  </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════════
+     9. INFRAESTRUCTURA
+═══════════════════════════════════════════════ -->
+<h1 id="infraestructura">9. Infraestructura en la nube</h1>
+
+<table>
+  <thead><tr><th>Servicio</th><th>Proveedor</th><th>Uso</th></tr></thead>
+  <tbody>
+    <tr><td>Object Storage</td><td>DigitalOcean Spaces</td><td>Almacena los PDFs generados. Bucket: <code>moldes-facil</code>, región <code>sfo3</code></td></tr>
+    <tr><td>CDN</td><td>DigitalOcean CDN</td><td>Distribución de los PDFs. URL: <code>moldes-facil.sfo3.cdn.digitaloceanspaces.com</code></td></tr>
+    <tr><td>API REST</td><td>DigitalOcean Droplet</td><td>Backend NestJS en <code>http://134.199.211.158:3002/api</code></td></tr>
+    <tr><td>Sheets log</td><td>Google Cloud / Sheets</td><td>Registro de operaciones en la nube, compartido entre operadores</td></tr>
+  </tbody>
+</table>
+
+<h2>Estructura de archivos en S3</h2>
+<pre><code>pdfs/{código}-{talla}-{tipo}-{timestamp}.pdf
+
+Ejemplos:
+  pdfs/569-14-A4-1716214800000.pdf
+  pdfs/370A-L-carta-1716214900000.pdf
+  pdfs/443-12-plotter-1716215000000.pdf</code></pre>
+
+<!-- ══════════════════════════════════════════════
+     10. BUILD Y DISTRIBUCIÓN
+═══════════════════════════════════════════════ -->
+<h1 id="build">10. Build y distribución</h1>
+
+<h2>macOS (desarrollo y producción)</h2>
+<pre><code># Iniciar en modo desarrollo
+env -u ELECTRON_RUN_AS_NODE npm start
+
+# Generar instalador .dmg para macOS
+npm run build:mac</code></pre>
+
+<div class="callout callout-warn">
+  <strong>⚠ Importante:</strong> El comando <code>npm start</code> debe ejecutarse con <code>env -u ELECTRON_RUN_AS_NODE</code> para evitar el error <em>"app is undefined"</em>.
+</div>
+
+<h2>Windows (automático via GitHub Actions)</h2>
+<ol class="steps">
+  <li>Ir al repositorio en GitHub → pestaña <strong>Actions</strong>.</li>
+  <li>Seleccionar el workflow <strong>"Build Windows"</strong>.</li>
+  <li>Hacer clic en <strong>"Run workflow"</strong>.</li>
+  <li>Esperar ~5 minutos. El instalador <code>.exe</code> aparece como artifact descargable.</li>
+</ol>
+
+<p>El workflow (<code>.github/workflows/build-win.yml</code>) corre en un runner <code>windows-latest</code> con Node 18 y genera el ejecutable con electron-builder.</p>
+
+<!-- ══════════════════════════════════════════════
+     11. TROUBLESHOOTING
+═══════════════════════════════════════════════ -->
+<h1 id="troubleshooting">11. Troubleshooting</h1>
+
+<table>
+  <thead><tr><th>Problema</th><th>Causa probable</th><th>Solución</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>La app muestra <em>"app is undefined"</em> al iniciar</td>
+      <td>Variable de entorno <code>ELECTRON_RUN_AS_NODE=1</code> activa</td>
+      <td>Iniciar con <code>env -u ELECTRON_RUN_AS_NODE npm start</code></td>
+    </tr>
+    <tr>
+      <td>Archivo con badge <em>"sin código"</em></td>
+      <td>El nombre no sigue ninguna de las dos convenciones esperadas</td>
+      <td>Renombrar el archivo al formato <code>CÓDIGO TALLA X.pdf</code> o <code>T-X molde CÓDIGO.pdf</code></td>
+    </tr>
+    <tr>
+      <td>Badge ✗ rojo (código no encontrado)</td>
+      <td>El código no existe aún en el catálogo web</td>
+      <td>Crear el producto en el panel administrativo antes de subir el PDF</td>
+    </tr>
+    <tr>
+      <td>Error <em>"API error: 404"</em> en la subida</td>
+      <td>El código del molde no existe en la base de datos</td>
+      <td>Verificar el código en el catálogo y corregir el nombre del archivo</td>
+    </tr>
+    <tr>
+      <td>Error <em>"API error: 401"</em></td>
+      <td>Token JWT expirado</td>
+      <td>La app renueva automáticamente. Si persiste, reiniciar la app</td>
+    </tr>
+    <tr>
+      <td>Google Sheets no sincroniza</td>
+      <td>Sin conexión a internet</td>
+      <td>Los datos se guardan en cola local. Se sincronizan automáticamente al volver la conexión</td>
+    </tr>
+    <tr>
+      <td>La sesión se cierra sola</td>
+      <td>Timeout de inactividad (15 min)</td>
+      <td>Normal. Volver a hacer login. Si molesta, contactar al administrador para ajustar el tiempo</td>
+    </tr>
+    <tr>
+      <td>PDF de salida incorrecto (corta líneas del molde)</td>
+      <td>El offset del grid no es óptimo</td>
+      <td>Usar la vista previa y ajustar los sliders, o hacer clic en "✨ Auto-ajustar"</td>
+    </tr>
+    <tr>
+      <td>Proceso muy lento con muchos archivos</td>
+      <td>Normal para lotes grandes en Google Drive</td>
+      <td>Copiar los archivos localmente antes de procesar, o esperar — el progreso es visible</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-info" style="margin-top:32px;">
+  <strong>Soporte:</strong> Para problemas no cubiertos en esta tabla, contactar al desarrollador con el reporte de errores descargado desde la app (botón <em>"⬇️ Descargar reporte de errores"</em>).
+</div>
+
+<hr style="margin:48px 0 24px; border:none; border-top: 1px solid var(--border);" />
+<p style="text-align:center; color:var(--muted); font-size:11px;">
+  Moldes Fácil Tiler · Documentación técnica interna · Mayo 2026 · Confidencial
+</p>
+
+</body>
+</html>

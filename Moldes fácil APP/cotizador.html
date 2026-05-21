@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cotizador de Proyectos Digitales</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --primary-light: #e0e7ff;
+      --success: #10b981;
+      --success-light: #d1fae5;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+      --light: #f8fafc;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* HEADER */
+    .header { background: white; border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    .header-brand { display: flex; align-items: center; gap: 10px; }
+    .header-brand .logo { width: 36px; height: 36px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 16px; }
+    .header-brand .brand-text h1 { font-size: 16px; font-weight: 700; color: var(--text); }
+    .header-brand .brand-text p { font-size: 12px; color: var(--muted); }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; transition: all .15s; text-decoration: none; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-outline { background: white; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { background: var(--bg); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { background: #059669; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* SETTINGS BAR */
+    .settings-bar { background: var(--primary); color: white; padding: 12px 24px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+    .settings-bar label { font-size: 12px; opacity: .8; display: block; margin-bottom: 3px; }
+    .settings-bar input, .settings-bar select { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); color: white; border-radius: 6px; padding: 5px 10px; font-size: 13px; outline: none; }
+    .settings-bar input::placeholder { color: rgba(255,255,255,.6); }
+    .settings-bar input:focus, .settings-bar select:focus { background: rgba(255,255,255,.25); border-color: white; }
+    .settings-bar select option { background: #4f46e5; color: white; }
+    .settings-group { display: flex; flex-direction: column; }
+    .settings-divider { width: 1px; background: rgba(255,255,255,.25); height: 40px; }
+    .toggle { width: 36px; height: 20px; background: rgba(255,255,255,.3); border-radius: 99px; position: relative; transition: background .2s; cursor: pointer; flex-shrink: 0; }
+    .toggle.on { background: var(--success); }
+    .toggle::after { content: ''; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; background: white; border-radius: 50%; transition: transform .2s; }
+    .toggle.on::after { transform: translateX(16px); }
+
+    /* MAIN LAYOUT */
+    .main { display: grid; grid-template-columns: 400px 1fr; gap: 0; height: calc(100vh - 113px); overflow: hidden; }
+
+    /* CATALOG PANEL */
+    .catalog-panel { background: white; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+    .catalog-search { padding: 12px 14px; border-bottom: 1px solid var(--border); background: white; }
+    .search-input-wrap { position: relative; }
+    .search-input-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+    .search-input { width: 100%; padding: 8px 10px 8px 34px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; transition: border-color .15s; }
+    .search-input:focus { border-color: var(--primary); }
+    .catalog-list { overflow-y: auto; flex: 1; padding: 8px; }
+    .category-group { margin-bottom: 4px; }
+    .category-header { padding: 10px 10px 6px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .module-item { display: flex; align-items: flex-start; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; transition: background .1s; border: 1px solid transparent; margin-bottom: 2px; }
+    .module-item:hover { background: var(--light); }
+    .module-item.selected { background: var(--primary-light); border-color: var(--primary); }
+    .module-item .check { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 5px; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+    .module-item.selected .check { background: var(--primary); border-color: var(--primary); }
+    .module-item.selected .check::after { content: '✓'; color: white; font-size: 11px; font-weight: 700; }
+    .module-info { flex: 1; min-width: 0; }
+    .module-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .module-desc { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+    /* Dual hours badge */
+    .hours-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+    .badge-trad { font-size: 10px; font-weight: 600; color: var(--muted); background: #f1f5f9; padding: 2px 6px; border-radius: 99px; text-decoration: line-through; }
+    .badge-ai { font-size: 11px; font-weight: 700; color: var(--success); background: var(--success-light); padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+
+    /* QUOTE PANEL */
+    .quote-panel { display: flex; flex-direction: column; overflow: hidden; }
+    .quote-content { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+
+    /* CARDS */
+    .card { background: white; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+    .card-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .card-title { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+    .card-body { padding: 14px 16px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+    .form-group input, .form-group textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; outline: none; transition: border-color .15s; font-family: inherit; }
+    .form-group input:focus, .form-group textarea:focus { border-color: var(--primary); }
+
+    /* ITEMS LIST */
+    .items-list { display: flex; flex-direction: column; gap: 6px; }
+    .empty-state { text-align: center; padding: 28px 16px; color: var(--muted); }
+    .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+    .empty-state p { font-size: 13px; }
+
+    /* ITEM ROW */
+    .item-row { background: var(--light); border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
+    .item-row.custom-item { border-left: 3px solid var(--warning); }
+    .item-main { display: flex; align-items: center; gap: 10px; padding: 9px 12px; }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .item-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .item-complexity { font-size: 11px; padding: 3px 7px; border-radius: 99px; border: 1px solid var(--border); background: white; cursor: pointer; outline: none; }
+    .hours-display { display: flex; align-items: center; gap: 6px; }
+    .hours-trad { font-size: 11px; color: var(--muted); text-decoration: line-through; }
+    .hours-ai-wrap { display: flex; align-items: center; gap: 3px; }
+    .hours-ai-wrap span { font-size: 11px; color: var(--success); font-weight: 700; }
+    .hours-input { width: 56px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; text-align: center; outline: none; font-weight: 600; color: var(--primary); }
+    .hours-input:focus { border-color: var(--primary); }
+    .item-cost { font-size: 13px; font-weight: 700; color: var(--primary); min-width: 68px; text-align: right; }
+    .remove-btn { background: none; border: none; cursor: pointer; color: var(--muted); padding: 3px; border-radius: 4px; display: flex; flex-shrink: 0; }
+    .remove-btn:hover { color: var(--danger); background: #fef2f2; }
+    /* Savings sub-row */
+    .item-saving { background: var(--success-light); padding: 4px 12px; font-size: 11px; color: #065f46; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+
+    /* CUSTOM ITEM */
+    .add-custom { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .add-custom input { flex: 1; min-width: 140px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; outline: none; }
+    .add-custom input:focus { border-color: var(--primary); }
+
+    /* FOOTER SUMMARY */
+    .quote-footer { background: white; border-top: 2px solid var(--border); padding: 14px 20px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 12px; }
+    .summary-stat { text-align: center; }
+    .summary-stat .stat-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+    .summary-stat .stat-value { font-size: 18px; font-weight: 800; color: var(--text); margin-top: 2px; }
+    .summary-stat .stat-value.striked { font-size: 14px; text-decoration: line-through; color: var(--muted); }
+    .summary-stat .stat-value.green { color: var(--success); }
+    .summary-stat .stat-value.highlight { color: var(--primary); }
+    .footer-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* SAVINGS BANNER */
+    .savings-banner { background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 1px solid #6ee7b7; border-radius: 8px; padding: 8px 14px; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .savings-banner.hidden { display: none; }
+    .savings-banner .s-icon { font-size: 20px; }
+    .savings-banner .s-text { flex: 1; }
+    .savings-banner .s-text strong { font-size: 13px; color: #065f46; display: block; }
+    .savings-banner .s-text span { font-size: 12px; color: #047857; }
+    .savings-banner .s-amount { font-size: 18px; font-weight: 800; color: var(--success); }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: white; border-radius: 16px; width: 720px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+    .modal-header { padding: 18px 24px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .modal-header h2 { font-size: 17px; font-weight: 700; }
+    .modal-body { padding: 24px; }
+    .modal-footer { padding: 14px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+    .close-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 22px; line-height: 1; padding: 2px; border-radius: 6px; }
+    .close-btn:hover { background: var(--bg); color: var(--text); }
+
+    /* PROPOSAL */
+    .proposal-header { display: flex; justify-content: space-between; margin-bottom: 20px; padding-bottom: 18px; border-bottom: 2px solid var(--primary); }
+    .proposal-brand { font-size: 19px; font-weight: 800; color: var(--primary); }
+    .proposal-brand p { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 3px; }
+    .proposal-client h3 { font-size: 14px; font-weight: 700; }
+    .proposal-client p { font-size: 13px; color: var(--muted); }
+
+    /* AI VALUE BOX */
+    .ai-value-box { background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 1px solid #6ee7b7; border-radius: 10px; padding: 14px 18px; margin: 16px 0; display: flex; align-items: center; gap: 16px; }
+    .ai-value-box .aiv-icon { font-size: 28px; }
+    .ai-value-box .aiv-text strong { font-size: 14px; color: #065f46; display: block; }
+    .ai-value-box .aiv-text p { font-size: 12px; color: #047857; margin-top: 2px; }
+    .ai-stats { display: flex; gap: 24px; margin-left: auto; text-align: center; }
+    .ai-stat .as-label { font-size: 10px; color: #047857; font-weight: 700; text-transform: uppercase; }
+    .ai-stat .as-value { font-size: 20px; font-weight: 800; color: var(--success); }
+
+    .proposal-table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+    .proposal-table th { background: var(--bg); padding: 8px 10px; font-size: 11px; text-align: left; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+    .proposal-table th.right { text-align: right; }
+    .proposal-table th.center { text-align: center; }
+    .proposal-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .proposal-table tr:last-child td { border-bottom: none; }
+    .td-trad { text-align: center; color: var(--muted); text-decoration: line-through; font-size: 12px; }
+    .td-ai { text-align: center; color: var(--success); font-weight: 700; }
+    .td-saving { text-align: center; font-size: 11px; color: #047857; background: var(--success-light); border-radius: 99px; padding: 2px 7px; white-space: nowrap; }
+    .td-cost { text-align: right; font-weight: 700; }
+
+    .proposal-totals { margin-top: 16px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .total-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .total-row:last-child { border-bottom: none; background: var(--primary-light); font-weight: 800; color: var(--primary); font-size: 16px; }
+    .total-row.saving-row { background: var(--success-light); color: #065f46; font-weight: 700; }
+
+    .proposal-notes { margin-top: 18px; padding: 12px 14px; background: var(--light); border-radius: 8px; font-size: 12px; color: var(--muted); }
+    .proposal-notes strong { color: var(--text); display: block; margin-bottom: 4px; font-size: 13px; }
+    .proposal-sig { margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+    .sig-line { border-top: 1px solid var(--border); padding-top: 6px; font-size: 12px; color: var(--muted); text-align: center; }
+
+    /* METHODOLOGY BOX */
+    .method-box { margin-top: 16px; padding: 12px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; }
+    .method-box p:first-child { font-size: 12px; font-weight: 700; color: #1e40af; margin-bottom: 4px; }
+    .method-box p { font-size: 12px; color: #1e40af; }
+
+    /* PRINT */
+    @media print {
+      .header, .settings-bar, .catalog-panel, .quote-footer, .modal-footer, .close-btn { display: none !important; }
+      .main { display: block; height: auto; }
+      .quote-panel { height: auto; }
+      .quote-content { overflow: visible; }
+      body { background: white; }
+      .modal-overlay { position: static; background: none; display: block !important; }
+      .modal { box-shadow: none; width: 100%; max-height: none; border-radius: 0; }
+    }
+
+    /* TOAST */
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; color: white; padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 999; opacity: 0; transform: translateY(10px); transition: all .3s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-brand">
+    <div class="logo">HG</div>
+    <div class="brand-text">
+      <h1 id="brand-name-display">Hans · Desarrollo Digital con IA</h1>
+      <p>Cotizador de Proyectos</p>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-outline btn-sm" onclick="loadQuote()">📂 Cargar</button>
+    <button class="btn btn-outline btn-sm" onclick="saveQuote()">💾 Guardar</button>
+    <button class="btn btn-outline btn-sm" onclick="resetAll()">🗑️ Nueva</button>
+    <button class="btn btn-primary" onclick="openProposal()">📄 Ver propuesta</button>
+  </div>
+</div>
+
+<!-- SETTINGS BAR -->
+<div class="settings-bar">
+  <div class="settings-group">
+    <label>Tu nombre / marca</label>
+    <input type="text" id="s-brand" placeholder="Hans · Dev IA" oninput="updateBrand()" style="width:180px">
+  </div>
+  <div class="settings-divider"></div>
+  <div class="settings-group">
+    <label>Tarifa por hora (USD)</label>
+    <input type="number" id="s-rate" value="35" min="1" style="width:80px" oninput="recalcAll()">
+  </div>
+  <div class="settings-divider"></div>
+  <div class="settings-group">
+    <label>Urgencia</label>
+    <select id="s-urgency" onchange="recalcAll()">
+      <option value="1">⚡ Normal ×1.0</option>
+      <option value="1.3">🔥 Urgente &lt;2sem ×1.3</option>
+      <option value="1.6">🚨 Crítico &lt;1sem ×1.6</option>
+    </select>
+  </div>
+  <div class="settings-divider"></div>
+  <div class="settings-group">
+    <label>Descuento (%)</label>
+    <input type="number" id="s-discount" value="0" min="0" max="100" style="width:60px" oninput="recalcAll()">
+  </div>
+  <div class="settings-divider"></div>
+  <div class="settings-group" style="flex-direction:row;align-items:center;gap:8px;padding-top:10px;">
+    <div id="s-iva-toggle" class="toggle" onclick="toggleIva()"></div>
+    <span style="font-size:12px;">IVA 19%</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- CATALOG PANEL -->
+  <div class="catalog-panel">
+    <div class="catalog-search">
+      <div class="search-input-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" class="search-input" id="search-input" placeholder="Buscar módulo..." oninput="filterCatalog()">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:var(--muted);">
+        <span style="text-decoration:line-through;color:#94a3b8;">Horas trad.</span>
+        <span style="color:var(--success);font-weight:700;">⚡ Horas con IA</span>
+      </div>
+    </div>
+    <div class="catalog-list" id="catalog-list"></div>
+  </div>
+
+  <!-- QUOTE PANEL -->
+  <div class="quote-panel">
+    <div class="quote-content">
+
+      <!-- CLIENT INFO -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">👤 Información del cliente</span></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group"><label>Nombre del cliente</label><input type="text" id="q-client" placeholder="Empresa o persona"></div>
+            <div class="form-group"><label>Nombre del proyecto</label><input type="text" id="q-project" placeholder="App, web, sistema..."></div>
+            <div class="form-group"><label>Email de contacto</label><input type="email" id="q-email" placeholder="cliente@email.com"></div>
+            <div class="form-group"><label>Fecha</label><input type="date" id="q-date"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SELECTED ITEMS -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">📦 Módulos seleccionados</span>
+          <span id="items-count" style="font-size:12px;color:var(--muted);">0 ítems</span>
+        </div>
+        <div class="card-body" style="padding:10px 14px;">
+          <div class="items-list" id="items-list">
+            <div class="empty-state">
+              <div class="icon">👈</div>
+              <p>Selecciona módulos del catálogo</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CUSTOM ITEM -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">✏️ Ítem personalizado</span></div>
+        <div class="card-body">
+          <div class="add-custom">
+            <input type="text" id="custom-name" placeholder="Nombre de la tarea específica">
+            <input type="number" id="custom-hours-trad" placeholder="Horas trad." min="0.5" step="0.5" style="width:96px" title="Horas estimadas desarrollo tradicional">
+            <input type="number" id="custom-hours-ai" placeholder="Horas IA" min="0.5" step="0.5" style="width:80px" title="Horas reales con IA">
+            <button class="btn btn-outline" onclick="addCustomItem()">+ Agregar</button>
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin-top:6px;">💡 Ingresa ambas horas para mostrar el ahorro al cliente</p>
+        </div>
+      </div>
+
+      <!-- NOTES -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">📝 Observaciones / Condiciones</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <textarea style="width:100%;min-height:70px;resize:vertical;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;font-family:inherit;" id="q-notes" placeholder="Ej: Los tiempos son estimativos. Pueden surgir complejidades adicionales en la lógica de negocio. Incluye 1 ronda de revisión por módulo. Pago: 50% al inicio, 50% al entregar."></textarea>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="quote-footer">
+      <div id="savings-banner" class="savings-banner hidden">
+        <div class="s-icon">⚡</div>
+        <div class="s-text">
+          <strong id="savings-hours-text">Ahorras X horas de desarrollo</strong>
+          <span>vs. un programador tradicional al mismo alcance</span>
+        </div>
+        <div class="s-amount" id="savings-money-text">$0</div>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-stat">
+          <div class="stat-label">Horas tradicionales</div>
+          <div class="stat-value striked" id="total-trad-hours">0h</div>
+        </div>
+        <div class="summary-stat">
+          <div class="stat-label">Horas con IA ⚡</div>
+          <div class="stat-value green" id="total-ai-hours">0h</div>
+        </div>
+        <div class="summary-stat">
+          <div class="stat-label">Subtotal</div>
+          <div class="stat-value" id="total-subtotal">$0</div>
+        </div>
+        <div class="summary-stat">
+          <div class="stat-label">Descuento</div>
+          <div class="stat-value green" id="total-discount">$0</div>
+        </div>
+        <div class="summary-stat">
+          <div class="stat-label">TOTAL</div>
+          <div class="stat-value highlight" id="total-final">$0</div>
+        </div>
+      </div>
+      <div class="footer-actions">
+        <button class="btn btn-outline" onclick="copyToClipboard()">📋 Copiar resumen</button>
+        <button class="btn btn-outline" onclick="printProposal()">🖨️ Imprimir / PDF</button>
+        <button class="btn btn-success" onclick="openProposal()">📄 Ver propuesta completa</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROPOSAL MODAL -->
+<div class="modal-overlay" id="proposal-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Propuesta de Proyecto</h2>
+      <button class="close-btn" onclick="closeProposal()">×</button>
+    </div>
+    <div class="modal-body" id="proposal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeProposal()">Cerrar</button>
+      <button class="btn btn-outline" onclick="copyProposalText()">📋 Copiar texto</button>
+      <button class="btn btn-primary" onclick="printProposal()">🖨️ Imprimir / PDF</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── CATALOG DATA ─────────────────────────────────────────────────────────────
+// tradHours = estimación de mercado (desarrollo humano)
+// aiHours   = estimación real con IA (Claude + VS Code)
+const catalog = [
+  {
+    category: "🎨 Diseño & UI",
+    modules: [
+      { id:"d1", name:"Landing Page", desc:"Página de presentación responsive: hero, features, CTA, footer", tradHours:6, aiHours:2 },
+      { id:"d2", name:"Dashboard / Panel de control", desc:"Panel con métricas, gráficas y navegación lateral", tradHours:12, aiHours:4 },
+      { id:"d3", name:"Componentes UI / Design System", desc:"Librería de componentes reutilizables (botones, forms, cards, modales)", tradHours:8, aiHours:2.5 },
+      { id:"d4", name:"Adaptación Mobile-First", desc:"Responsive completo para celulares y tablets", tradHours:4, aiHours:1.5 },
+      { id:"d5", name:"Dark Mode", desc:"Modo oscuro con toggle y persistencia de preferencia", tradHours:3, aiHours:1 },
+    ]
+  },
+  {
+    category: "🔐 Autenticación & Seguridad",
+    modules: [
+      { id:"a1", name:"Login y Registro de usuarios", desc:"Autenticación con email y contraseña, validaciones y mensajes de error", tradHours:4, aiHours:1.5 },
+      { id:"a2", name:"Login Social (Google / Apple)", desc:"Autenticación OAuth con proveedores externos", tradHours:3, aiHours:1 },
+      { id:"a3", name:"Recuperación de contraseña", desc:"Flujo completo de reset por email", tradHours:2, aiHours:0.5 },
+      { id:"a4", name:"Roles y Permisos", desc:"Sistema de roles (admin, usuario, invitado) con control de acceso por ruta", tradHours:6, aiHours:2 },
+      { id:"a5", name:"Autenticación 2FA", desc:"Verificación de dos factores (app autenticadora o SMS)", tradHours:4, aiHours:1.5 },
+      { id:"a6", name:"Sesiones y tokens JWT", desc:"Manejo seguro de sesiones, refresh tokens y expiración", tradHours:3, aiHours:1 },
+    ]
+  },
+  {
+    category: "🗄️ Base de Datos",
+    modules: [
+      { id:"b1", name:"Configuración inicial DB", desc:"Setup de base de datos, modelos, schemas y migraciones", tradHours:3, aiHours:1 },
+      { id:"b2", name:"CRUD de entidad", desc:"Operaciones básicas para un tipo de dato (precio por entidad adicional)", tradHours:4, aiHours:1.5 },
+      { id:"b3", name:"Relaciones complejas", desc:"Modelos con múltiples relaciones, joins y consultas avanzadas", tradHours:8, aiHours:3 },
+      { id:"b4", name:"Seed / datos de prueba", desc:"Población inicial de la base de datos para desarrollo y demo", tradHours:2, aiHours:0.5 },
+    ]
+  },
+  {
+    category: "⚙️ Funcionalidades",
+    modules: [
+      { id:"f1", name:"Panel de Administración", desc:"Back-office completo para gestionar contenido, usuarios y datos", tradHours:12, aiHours:4 },
+      { id:"f2", name:"Carrito de Compras", desc:"Ecommerce: carrito, wishlist, cálculo de totales y checkout", tradHours:16, aiHours:6 },
+      { id:"f3", name:"Pasarela de Pago", desc:"Integración con Stripe, PayPal, MercadoPago u otro", tradHours:8, aiHours:3 },
+      { id:"f4", name:"Sistema de Notificaciones", desc:"Notificaciones en-app, email y/o push (Firebase)", tradHours:6, aiHours:2 },
+      { id:"f5", name:"Chat en Tiempo Real", desc:"Mensajería en vivo con WebSockets o Firebase", tradHours:12, aiHours:4 },
+      { id:"f6", name:"Búsqueda y Filtros", desc:"Búsqueda con filtros múltiples, ordenamiento y paginación", tradHours:5, aiHours:2 },
+      { id:"f7", name:"Carga de Archivos / Imágenes", desc:"Upload con preview, validación y almacenamiento en cloud (S3, Cloudinary)", tradHours:4, aiHours:1.5 },
+      { id:"f8", name:"Generación de Reportes / PDF", desc:"Exportación de datos y documentos en formato PDF o Excel", tradHours:4, aiHours:1.5 },
+      { id:"f9", name:"API REST", desc:"Endpoints documentados (Swagger) para consumo por frontend o terceros", tradHours:8, aiHours:3 },
+      { id:"f10", name:"Integración con API de terceros", desc:"Conexión con servicio externo: CRM, ERP, analytics, correo, etc.", tradHours:6, aiHours:2.5 },
+      { id:"f11", name:"Formulario de Contacto / Leads", desc:"Captura con validación, anti-spam y notificación al admin", tradHours:2, aiHours:0.5 },
+      { id:"f12", name:"Blog / CMS", desc:"Gestión de contenido con editor rich text, categorías y SEO", tradHours:10, aiHours:3.5 },
+      { id:"f13", name:"Calendario / Agenda / Reservas", desc:"Sistema de eventos, disponibilidad y citas en línea", tradHours:10, aiHours:4 },
+      { id:"f14", name:"Mapa interactivo", desc:"Integración de Google Maps o Mapbox con marcadores y geolocalización", tradHours:5, aiHours:2 },
+      { id:"f15", name:"Sistema de Reviews / Valoraciones", desc:"Calificaciones, comentarios y moderación", tradHours:5, aiHours:2 },
+      { id:"f16", name:"Internacionalización (i18n)", desc:"Multi-idioma con cambio dinámico y textos localizados", tradHours:6, aiHours:2 },
+    ]
+  },
+  {
+    category: "🚀 Despliegue & DevOps",
+    modules: [
+      { id:"v1", name:"Configuración de servidor", desc:"Setup en Digital Ocean, Railway, Render, Vercel u otro proveedor", tradHours:4, aiHours:2 },
+      { id:"v2", name:"Dominio y SSL", desc:"Configuración de dominio personalizado con certificado HTTPS", tradHours:1.5, aiHours:0.5 },
+      { id:"v3", name:"CI/CD básico", desc:"Pipeline de despliegue automático con GitHub Actions u otro", tradHours:5, aiHours:2.5 },
+      { id:"v4", name:"Variables de entorno y secrets", desc:"Gestión segura de configuración entre entornos (dev, staging, prod)", tradHours:1.5, aiHours:0.5 },
+      { id:"v5", name:"Monitoreo y logs", desc:"Setup de logging, alertas de errores (Sentry) y métricas básicas", tradHours:3, aiHours:1.5 },
+    ]
+  },
+  {
+    category: "🤝 Consultoría & Estrategia",
+    modules: [
+      { id:"c1", name:"Consultoría estratégica inicial", desc:"Análisis de requerimientos, arquitectura y roadmap del proyecto", tradHours:3, aiHours:2.5 },
+      { id:"c2", name:"Sesión colaborativa con cliente", desc:"Desarrollo en tiempo real junto al cliente (por sesión de 2h)", tradHours:2, aiHours:2 },
+      { id:"c3", name:"Auditoría de sistema existente", desc:"Revisión y diagnóstico de proyecto heredado o en producción", tradHours:4, aiHours:3 },
+      { id:"c4", name:"Capacitación / Handoff", desc:"Formación al equipo cliente para operar el sistema entregado", tradHours:3, aiHours:2.5 },
+      { id:"c5", name:"Documentación técnica", desc:"Documentación de arquitectura, APIs y guías de uso", tradHours:4, aiHours:2 },
+    ]
+  },
+];
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let selectedItems = [];
+let ivaEnabled = false;
+let customIdCounter = 1000;
+
+const complexityMult = { simple:0.7, standard:1.0, complex:1.5, vcomplex:2.0 };
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  renderCatalog(catalog);
+  document.getElementById('q-date').value = new Date().toISOString().split('T')[0];
+  recalcAll();
+  const saved = localStorage.getItem('cotizador-settings');
+  if (saved) {
+    try {
+      const s = JSON.parse(saved);
+      if (s.brand) { document.getElementById('s-brand').value = s.brand; updateBrand(); }
+      if (s.rate)  document.getElementById('s-rate').value = s.rate;
+    } catch(e) {}
+  }
+});
+
+// ─── CATALOG ──────────────────────────────────────────────────────────────────
+function renderCatalog(data) {
+  const container = document.getElementById('catalog-list');
+  container.innerHTML = '';
+  let hasResults = false;
+  data.forEach(group => {
+    if (!group.modules.length) return;
+    hasResults = true;
+    const groupEl = document.createElement('div');
+    groupEl.className = 'category-group';
+    const header = document.createElement('div');
+    header.className = 'category-header';
+    header.textContent = group.category;
+    groupEl.appendChild(header);
+    group.modules.forEach(mod => {
+      const isSelected = selectedItems.some(i => i.id === mod.id);
+      const item = document.createElement('div');
+      item.className = 'module-item' + (isSelected ? ' selected' : '');
+      item.id = 'cat-' + mod.id;
+      item.innerHTML = `
+        <div class="check"></div>
+        <div class="module-info">
+          <div class="module-name">${mod.name}</div>
+          <div class="module-desc">${mod.desc}</div>
+        </div>
+        <div class="hours-badges">
+          <span class="badge-trad">${mod.tradHours}h</span>
+          <span class="badge-ai">⚡ ${mod.aiHours}h</span>
+        </div>
+      `;
+      item.onclick = () => toggleModule(mod, item);
+      groupEl.appendChild(item);
+    });
+    container.appendChild(groupEl);
+  });
+  if (!hasResults) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 16px;color:var(--muted);font-size:13px;">Sin resultados</div>';
+  }
+}
+
+function filterCatalog() {
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  if (!q) { renderCatalog(catalog); return; }
+  const filtered = catalog.map(g => ({ ...g, modules: g.modules.filter(m => m.name.toLowerCase().includes(q) || m.desc.toLowerCase().includes(q)) }));
+  renderCatalog(filtered);
+}
+
+function toggleModule(mod, el) {
+  const idx = selectedItems.findIndex(i => i.id === mod.id);
+  if (idx >= 0) {
+    selectedItems.splice(idx, 1);
+    el.classList.remove('selected');
+  } else {
+    selectedItems.push({ id:mod.id, name:mod.name, tradHours:mod.tradHours, aiBaseHours:mod.aiHours, complexity:'standard', isCustom:false });
+    el.classList.add('selected');
+  }
+  renderItems(); recalcAll();
+}
+
+// ─── ITEMS ────────────────────────────────────────────────────────────────────
+function getEffectiveAiHours(item) {
+  const mult = complexityMult[item.complexity] || 1;
+  return Math.round(item.aiBaseHours * mult * 10) / 10;
+}
+function getEffectiveTradHours(item) {
+  const mult = complexityMult[item.complexity] || 1;
+  return Math.round(item.tradHours * mult * 10) / 10;
+}
+
+function renderItems() {
+  const list = document.getElementById('items-list');
+  document.getElementById('items-count').textContent = selectedItems.length + ' ítem' + (selectedItems.length !== 1 ? 's' : '');
+  if (!selectedItems.length) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">👈</div><p>Selecciona módulos del catálogo</p></div>';
+    return;
+  }
+  const rate = parseFloat(document.getElementById('s-rate').value) || 35;
+  const urgency = parseFloat(document.getElementById('s-urgency').value) || 1;
+  list.innerHTML = '';
+  selectedItems.forEach((item, idx) => {
+    const aiH = getEffectiveAiHours(item);
+    const tradH = getEffectiveTradHours(item);
+    const cost = aiH * rate * urgency;
+    const savedH = Math.round((tradH - aiH) * 10) / 10;
+    const savedMoney = Math.round(savedH * rate * urgency);
+
+    const row = document.createElement('div');
+    row.className = 'item-row' + (item.isCustom ? ' custom-item' : '');
+    row.innerHTML = `
+      <div class="item-main">
+        <div class="item-info">
+          <div class="item-name">${item.name}</div>
+          <div class="item-meta">${complexityLabel(item.complexity)}${item.isCustom ? ' · Personalizado' : ''}</div>
+        </div>
+        <div class="item-controls">
+          <select class="item-complexity" onchange="changeComplexity(${idx},this.value)">
+            <option value="simple" ${item.complexity==='simple'?'selected':''}>Simple ×0.7</option>
+            <option value="standard" ${item.complexity==='standard'?'selected':''}>Estándar ×1.0</option>
+            <option value="complex" ${item.complexity==='complex'?'selected':''}>Complejo ×1.5</option>
+            <option value="vcomplex" ${item.complexity==='vcomplex'?'selected':''}>Muy complejo ×2.0</option>
+          </select>
+          <div class="hours-display">
+            <span class="hours-trad">${tradH}h</span>
+            <span style="color:var(--muted);font-size:11px;">→</span>
+            <div class="hours-ai-wrap">
+              <span>⚡</span>
+              <input type="number" class="hours-input" value="${item.aiBaseHours}" min="0.5" step="0.5" onchange="changeAiHours(${idx},this.value)" title="Horas con IA (editable)">
+            </div>
+          </div>
+          <div class="item-cost">$${fmt(cost)}</div>
+          <button class="remove-btn" onclick="removeItem(${idx})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      ${savedH > 0 ? `<div class="item-saving">⚡ Ahorro vs. tradicional: ${savedH}h = $${fmt(savedMoney)} USD</div>` : ''}
+    `;
+    list.appendChild(row);
+  });
+}
+
+function complexityLabel(c) {
+  return { simple:'Simple', standard:'Estándar', complex:'Complejo', vcomplex:'Muy complejo' }[c] || 'Estándar';
+}
+function changeComplexity(idx, val) { selectedItems[idx].complexity = val; renderItems(); recalcAll(); }
+function changeAiHours(idx, val) { selectedItems[idx].aiBaseHours = parseFloat(val)||0.5; renderItems(); recalcAll(); }
+function removeItem(idx) {
+  const item = selectedItems[idx];
+  const catEl = document.getElementById('cat-' + item.id);
+  if (catEl) catEl.classList.remove('selected');
+  selectedItems.splice(idx, 1);
+  renderItems(); recalcAll();
+}
+function addCustomItem() {
+  const name = document.getElementById('custom-name').value.trim();
+  const tradH = parseFloat(document.getElementById('custom-hours-trad').value) || 0;
+  const aiH = parseFloat(document.getElementById('custom-hours-ai').value) || 0;
+  if (!name) { toast('Ingresa un nombre para el ítem'); return; }
+  if (!aiH) { toast('Ingresa las horas IA'); return; }
+  selectedItems.push({ id:'c'+customIdCounter++, name, tradHours: tradH || aiH, aiBaseHours: aiH, complexity:'standard', isCustom:true });
+  document.getElementById('custom-name').value = '';
+  document.getElementById('custom-hours-trad').value = '';
+  document.getElementById('custom-hours-ai').value = '';
+  renderItems(); recalcAll();
+}
+
+// ─── CALC ─────────────────────────────────────────────────────────────────────
+function recalcAll() {
+  const rate = parseFloat(document.getElementById('s-rate').value) || 35;
+  const urgency = parseFloat(document.getElementById('s-urgency').value) || 1;
+  const discount = parseFloat(document.getElementById('s-discount').value) || 0;
+
+  let totalTradH = 0, totalAiH = 0;
+  selectedItems.forEach(item => {
+    totalTradH += getEffectiveTradHours(item);
+    totalAiH += getEffectiveAiHours(item);
+  });
+
+  const subtotal = totalAiH * rate * urgency;
+  const discountAmt = subtotal * (discount / 100);
+  const afterDiscount = subtotal - discountAmt;
+  const iva = ivaEnabled ? afterDiscount * 0.19 : 0;
+  const final = afterDiscount + iva;
+
+  const savedH = Math.round((totalTradH - totalAiH) * 10) / 10;
+  const savedMoney = Math.round(savedH * rate * urgency);
+
+  document.getElementById('total-trad-hours').textContent = r(totalTradH) + 'h';
+  document.getElementById('total-ai-hours').textContent = r(totalAiH) + 'h';
+  document.getElementById('total-subtotal').textContent = '$' + fmt(subtotal);
+  document.getElementById('total-discount').textContent = discount > 0 ? '-$' + fmt(discountAmt) : '$0';
+  document.getElementById('total-final').textContent = '$' + fmt(final);
+
+  const banner = document.getElementById('savings-banner');
+  if (savedH > 0 && selectedItems.length > 0) {
+    banner.classList.remove('hidden');
+    document.getElementById('savings-hours-text').textContent = `Cliente ahorra ${savedH}h de desarrollo`;
+    document.getElementById('savings-money-text').textContent = '$' + fmt(savedMoney) + ' USD';
+  } else {
+    banner.classList.add('hidden');
+  }
+
+  localStorage.setItem('cotizador-settings', JSON.stringify({ brand: document.getElementById('s-brand').value, rate }));
+}
+
+function toggleIva() {
+  ivaEnabled = !ivaEnabled;
+  document.getElementById('s-iva-toggle').classList.toggle('on', ivaEnabled);
+  recalcAll();
+}
+function r(n) { return Math.round(n * 10) / 10; }
+function fmt(n) { return n.toLocaleString('en-US', { minimumFractionDigits:0, maximumFractionDigits:0 }); }
+
+// ─── PROPOSAL ─────────────────────────────────────────────────────────────────
+function buildData() {
+  const rate = parseFloat(document.getElementById('s-rate').value) || 35;
+  const urgency = parseFloat(document.getElementById('s-urgency').value) || 1;
+  const discount = parseFloat(document.getElementById('s-discount').value) || 0;
+  const urgencyText = {'1':'Normal','1.3':'Urgente (×1.3)','1.6':'Crítico (×1.6)'}[String(urgency)] || 'Normal';
+
+  let totalTradH = 0, totalAiH = 0;
+  const lineItems = selectedItems.map(item => {
+    const aiH = getEffectiveAiHours(item);
+    const tradH = getEffectiveTradHours(item);
+    const cost = aiH * rate * urgency;
+    totalTradH += tradH; totalAiH += aiH;
+    return { name:item.name, complexity:complexityLabel(item.complexity), tradH, aiH, savedH: r(tradH - aiH), cost, isCustom:item.isCustom };
+  });
+
+  const subtotal = totalAiH * rate * urgency;
+  const discountAmt = subtotal * (discount/100);
+  const afterDiscount = subtotal - discountAmt;
+  const iva = ivaEnabled ? afterDiscount * 0.19 : 0;
+  const final = afterDiscount + iva;
+  const savedH = r(totalTradH - totalAiH);
+  const savedMoney = Math.round(savedH * rate * urgency);
+
+  return {
+    brand: document.getElementById('s-brand').value || 'Tu Nombre',
+    client: document.getElementById('q-client').value || '—',
+    project: document.getElementById('q-project').value || '—',
+    email: document.getElementById('q-email').value,
+    date: document.getElementById('q-date').value,
+    notes: document.getElementById('q-notes').value,
+    rate, urgency, urgencyText, discount, discountAmt, afterDiscount, iva, final,
+    subtotal, totalTradH: r(totalTradH), totalAiH: r(totalAiH), savedH, savedMoney,
+    lineItems
+  };
+}
+
+function openProposal() {
+  const d = buildData();
+  if (!d.lineItems.length) { toast('Agrega al menos un módulo primero'); return; }
+  const dateFormatted = new Date(d.date + 'T12:00:00').toLocaleDateString('es-CL', { day:'2-digit', month:'long', year:'numeric' });
+
+  const rows = d.lineItems.map(li => `
+    <tr>
+      <td>${li.name}${li.isCustom ? ' <span style="font-size:10px;color:var(--warning);">· personalizado</span>' : ''}</td>
+      <td style="text-align:center;font-size:12px;">${li.complexity}</td>
+      <td class="td-trad">${li.tradH}h</td>
+      <td class="td-ai">⚡ ${li.aiH}h</td>
+      <td style="text-align:center;">${li.savedH > 0 ? `<span class="td-saving">−${li.savedH}h</span>` : '—'}</td>
+      <td class="td-cost">$${fmt(li.cost)}</td>
+    </tr>
+  `).join('');
+
+  let totalsHtml = `<div class="total-row"><span>Subtotal (${d.totalAiH}h IA × $${d.rate}/h × ${d.urgencyText})</span><span>$${fmt(d.subtotal)}</span></div>`;
+  if (d.discount > 0) totalsHtml += `<div class="total-row" style="color:var(--success)"><span>Descuento (${d.discount}%)</span><span>−$${fmt(d.discountAmt)}</span></div>`;
+  if (d.iva > 0) totalsHtml += `<div class="total-row"><span>IVA (19%)</span><span>$${fmt(d.iva)}</span></div>`;
+  totalsHtml += `<div class="total-row"><span>TOTAL</span><span>$${fmt(d.final)} USD</span></div>`;
+
+  document.getElementById('proposal-body').innerHTML = `
+    <div class="proposal-header">
+      <div class="proposal-brand">
+        ${d.brand}
+        <p>Desarrollo Digital · IA Aplicada + Colaboración en tiempo real</p>
+      </div>
+      <div class="proposal-client" style="text-align:right;">
+        <h3>${d.client}</h3>
+        <p>${d.project}</p>
+        ${d.email ? `<p style="color:var(--muted)">${d.email}</p>` : ''}
+        <p style="margin-top:4px;color:var(--muted);">${dateFormatted}</p>
+      </div>
+    </div>
+
+    ${d.savedH > 0 ? `
+    <div class="ai-value-box">
+      <div class="aiv-icon">⚡</div>
+      <div class="aiv-text">
+        <strong>Ventaja del desarrollo con Inteligencia Artificial</strong>
+        <p>Este proyecto se desarrolla con IA aplicada (Claude + VS Code), reduciendo los tiempos significativamente respecto al mercado.</p>
+      </div>
+      <div class="ai-stats">
+        <div class="ai-stat">
+          <div class="as-label">Horas ahorradas</div>
+          <div class="as-value">${d.savedH}h</div>
+        </div>
+        <div class="ai-stat">
+          <div class="as-label">Ahorro en costo</div>
+          <div class="as-value">$${fmt(d.savedMoney)}</div>
+        </div>
+      </div>
+    </div>` : ''}
+
+    <h3 style="font-size:13px;font-weight:700;margin-bottom:10px;">Detalle de módulos y servicios</h3>
+    <table class="proposal-table">
+      <thead>
+        <tr>
+          <th>Módulo / Servicio</th>
+          <th class="center">Complejidad</th>
+          <th class="center">Horas trad.</th>
+          <th class="center">Horas IA ⚡</th>
+          <th class="center">Ahorro</th>
+          <th class="right">Valor (USD)</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div class="proposal-totals">
+      ${d.savedH > 0 ? `<div class="total-row saving-row"><span>⚡ Ahorro total vs. desarrollo tradicional (${d.totalTradH}h → ${d.totalAiH}h)</span><span>$${fmt(d.savedMoney)} USD</span></div>` : ''}
+      ${totalsHtml}
+    </div>
+
+    ${d.notes ? `<div class="proposal-notes"><strong>Condiciones y observaciones:</strong>${d.notes}</div>` : ''}
+
+    <div class="method-box">
+      <p>📌 METODOLOGÍA DE TRABAJO</p>
+      <p>Desarrollo colaborativo en tiempo real usando Inteligencia Artificial aplicada (Claude + VS Code). El cliente participa activamente en las sesiones, lo que reduce iteraciones y asegura que el resultado cumpla exactamente sus expectativas. Los tiempos indicados son estimativos — complejidades adicionales en la lógica de negocio pueden extenderlos.</p>
+    </div>
+
+    <div class="proposal-sig">
+      <div><div class="sig-line">${d.brand} — Proveedor</div></div>
+      <div><div class="sig-line">${d.client} — Cliente</div></div>
+    </div>
+  `;
+  document.getElementById('proposal-modal').classList.add('open');
+}
+
+function closeProposal() { document.getElementById('proposal-modal').classList.remove('open'); }
+function printProposal() {
+  if (!document.getElementById('proposal-modal').classList.contains('open')) openProposal();
+  setTimeout(() => window.print(), 150);
+}
+function copyProposalText() {
+  const d = buildData();
+  if (!d.lineItems.length) { toast('Agrega módulos primero'); return; }
+  let t = `COTIZACIÓN — ${d.brand}\nCliente: ${d.client} | Proyecto: ${d.project} | Fecha: ${d.date}\n\n`;
+  t += `MÓDULOS:\n`;
+  d.lineItems.forEach(li => { t += `• ${li.name} | Trad: ${li.tradH}h → IA: ${li.aiH}h | $${fmt(li.cost)} USD\n`; });
+  t += `\nHoras tradicionales: ${d.totalTradH}h → Horas con IA: ${d.totalAiH}h (ahorro: ${d.savedH}h)\n`;
+  t += `TOTAL: $${fmt(d.final)} USD\n`;
+  if (d.notes) t += `\nCondiciones: ${d.notes}\n`;
+  navigator.clipboard.writeText(t).then(() => toast('📋 Texto copiado'));
+}
+function copyToClipboard() { copyProposalText(); }
+
+// ─── SAVE / LOAD ──────────────────────────────────────────────────────────────
+function saveQuote() {
+  const state = {
+    selectedItems, ivaEnabled,
+    client: document.getElementById('q-client').value,
+    project: document.getElementById('q-project').value,
+    email: document.getElementById('q-email').value,
+    date: document.getElementById('q-date').value,
+    notes: document.getElementById('q-notes').value,
+    brand: document.getElementById('s-brand').value,
+    rate: document.getElementById('s-rate').value,
+    urgency: document.getElementById('s-urgency').value,
+    discount: document.getElementById('s-discount').value,
+  };
+  localStorage.setItem('cotizador-last-quote', JSON.stringify(state));
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cotizacion-${(state.client||'cliente').replace(/\s+/g,'-')}-${(state.project||'proyecto').replace(/\s+/g,'-')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('💾 Cotización guardada');
+}
+function loadQuote() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try { applyState(JSON.parse(ev.target.result)); toast('📂 Cotización cargada'); }
+      catch { toast('❌ Error al leer el archivo'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+function applyState(s) {
+  selectedItems = s.selectedItems || [];
+  ivaEnabled = s.ivaEnabled || false;
+  document.getElementById('s-iva-toggle').classList.toggle('on', ivaEnabled);
+  ['client','project','email','date','notes'].forEach(k => { if (s[k]) document.getElementById('q-'+k).value = s[k]; });
+  ['brand','rate','urgency','discount'].forEach(k => { if (s[k]) document.getElementById('s-'+k).value = s[k]; });
+  if (s.brand) updateBrand();
+  renderCatalog(catalog); renderItems(); recalcAll();
+}
+function resetAll() {
+  if (!confirm('¿Comenzar una nueva cotización?')) return;
+  selectedItems = []; ivaEnabled = false;
+  document.getElementById('s-iva-toggle').classList.remove('on');
+  ['q-client','q-project','q-email','q-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('q-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('s-urgency').value = '1';
+  document.getElementById('s-discount').value = '0';
+  renderCatalog(catalog); renderItems(); recalcAll();
+  toast('🆕 Nueva cotización iniciada');
+}
+function updateBrand() {
+  const v = document.getElementById('s-brand').value;
+  document.getElementById('brand-name-display').textContent = v || 'Hans · Desarrollo Digital con IA';
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+document.getElementById('proposal-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeProposal();
+});
+</script>
+</body>
+</html>
