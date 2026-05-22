@@ -24,7 +24,7 @@ jobs:
         run: npm ci
 
       - name: Build Windows (.exe)
-        run: npm run build:win
+        run: npx electron-builder --win --publish never
 
       - name: Subir instalador como artefacto
         uses: actions/upload-artifact@v4
