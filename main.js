@@ -9,7 +9,7 @@ const fs         = require('fs');
 const os         = require('os');
 const crypto     = require('crypto');
 const WorkerPool = require('./tiler/workerPool');
-const { A4_W, A4_H, LETTER_W, LETTER_H } = require('./tiler/pdfTilerEngine');
+const { A4_W, A4_H, LETTER_W, LETTER_H, normalizePlotterPdf } = require('./tiler/pdfTilerEngine');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { syncToSheets, flushPendingQueue, getQueueSize } = require('./sheets-sync');
 
@@ -222,12 +222,14 @@ ipcMain.handle('batch-tile', async (event, { files, outputFolder, options, batch
         ? normalizeOutputName(_parsed.code, _parsed.talla)
         : file.name.replace(/\.pdf$/i, '').replace(/\bMOLDE\b/g, 'molde');
 
-      // Si es plotter, copiar el archivo original sin procesar
+      // Si es plotter, normalizar orientación (90 cm = ancho) y guardar
       if (fmt === 'plotter') {
         const pdfFileName = `${baseName} Plotter.pdf`;
         const outputPath  = path.join(destFolders[fmt], pdfFileName);
         if (!skipIfExists || !fs.existsSync(outputPath)) {
-          fs.copyFileSync(file.path, outputPath);
+          const srcBuf  = await fs.promises.readFile(file.path);
+          const outBuf  = await normalizePlotterPdf(srcBuf);
+          await fs.promises.writeFile(outputPath, outBuf);
         }
         event.sender.send('tile-progress', {
           current:  ++progress,
@@ -512,7 +514,8 @@ ipcMain.handle('process-and-upload', async (event, { files, formats }) => {
 
         console.log('[debug] procesando archivo:', file.name, 'formato:', fmt);
         if (fmt === 'plotter') {
-          pdfBuffer = await fs.promises.readFile(file.path);
+          const srcBuf = await fs.promises.readFile(file.path);
+          pdfBuffer = await normalizePlotterPdf(srcBuf);
         } else {
           const paddingX   = file[`paddingX_${fmt}`] || 0;
           const paddingY   = file[`paddingY_${fmt}`] || 0;

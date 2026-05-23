@@ -217,4 +217,44 @@ async function tilePDF(sourceBuffer, options = {}) {
   };
 }
 
-module.exports = { tilePDF, detectDimensions, A4_W, A4_H, LETTER_W, LETTER_H, PT_PER_MM };
+/**
+ * Normaliza un PDF plotter para que los 90 cm queden siempre como ancho (eje X).
+ * Si el PDF ya tiene 90 cm como ancho → devuelve el buffer sin cambios.
+ * Si tiene 90 cm como alto (portrait) → rota 90° CCW y devuelve el PDF corregido.
+ */
+async function normalizePlotterPdf(sourceBuffer) {
+  const srcDoc = await PDFDocument.load(sourceBuffer, { ignoreEncryption: true });
+  const pages  = srcDoc.getPages();
+  if (!pages.length) throw new Error('PDF sin páginas');
+
+  const { width: srcW, height: srcH } = pages[0].getSize();
+  let userUnit = 1;
+  try {
+    const uu = pages[0].node.get(PDFName.of('UserUnit'));
+    if (uu && typeof uu.asNumber === 'function') userUnit = uu.asNumber();
+  } catch {}
+  const realW = srcW * userUnit;
+  const realH = srcH * userUnit;
+
+  const { needsRotation } = detectPlotterAxis(realW, realH);
+  if (!needsRotation) return sourceBuffer; // ya está correcto
+
+  // Rotar 90° CCW: realH (90 cm) pasa a ser el ancho, realW (largo) el alto
+  const outDoc = await PDFDocument.create();
+  const [embedded] = await outDoc.embedPdf(sourceBuffer, [0]);
+
+  // Nueva página: ancho = realH (90 cm), alto = realW (largo del molde)
+  const newPage = outDoc.addPage([realH, realW]);
+  newPage.drawPage(embedded, {
+    x:      realH,   // ancla de rotación CCW
+    y:      0,
+    width:  realW,
+    height: realH,
+    rotate: degrees(90),
+  });
+
+  const pdfBytes = await outDoc.save({ useObjectStreams: true });
+  return Buffer.from(pdfBytes);
+}
+
+module.exports = { tilePDF, detectDimensions, normalizePlotterPdf, A4_W, A4_H, LETTER_W, LETTER_H, PT_PER_MM };
