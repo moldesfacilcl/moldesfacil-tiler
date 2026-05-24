@@ -11,7 +11,15 @@ const crypto     = require('crypto');
 const WorkerPool = require('./tiler/workerPool');
 const { A4_W, A4_H, LETTER_W, LETTER_H, normalizePlotterPdf } = require('./tiler/pdfTilerEngine');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-const { syncToSheets, flushPendingQueue, getQueueSize } = require('./sheets-sync');
+
+let _sheetsSync = null;
+function getSheetsModule() {
+  if (!_sheetsSync) _sheetsSync = require('./sheets-sync');
+  return _sheetsSync;
+}
+function syncToSheets(...args) { return getSheetsModule().syncToSheets(...args); }
+function flushPendingQueue() { return getSheetsModule().flushPendingQueue(); }
+function getQueueSize() { return getSheetsModule().getQueueSize(); }
 
 const s3 = new S3Client({
   endpoint:    'https://sfo3.digitaloceanspaces.com',
@@ -26,22 +34,25 @@ const s3 = new S3Client({
 // ── Autenticación local ───────────────────────────────────────────────────────
 const ACCESS_EMAIL  = 'info@moldesfacil.cl';
 const ACCESS_HASH   = crypto.createHash('sha256').update('MoldesFacil2026').digest('hex');
-const SESSION_FILE  = path.join(app.getPath('userData'), 'session.json');
 const SESSION_TTL   = 30 * 24 * 60 * 60 * 1000; // 30 días
+
+function getSessionFile() {
+  return path.join(app.getPath('userData'), 'session.json');
+}
 
 function isSessionValid() {
   try {
-    const s = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'));
+    const s = JSON.parse(fs.readFileSync(getSessionFile(), 'utf8'));
     return s.token === ACCESS_HASH && Date.now() - s.ts < SESSION_TTL;
   } catch { return false; }
 }
 
 function saveSession() {
-  fs.writeFileSync(SESSION_FILE, JSON.stringify({ token: ACCESS_HASH, ts: Date.now() }));
+  fs.writeFileSync(getSessionFile(), JSON.stringify({ token: ACCESS_HASH, ts: Date.now() }));
 }
 
 ipcMain.handle('logout', (event) => {
-  try { fs.unlinkSync(SESSION_FILE); } catch {}
+  try { fs.unlinkSync(getSessionFile()); } catch {}
   BrowserWindow.fromWebContents(event.sender)
     .loadFile(path.join(__dirname, 'renderer', 'login.html'));
 });
@@ -79,6 +90,13 @@ const FORMAT_INFO = {
   plotter: { label: 'Plotter', tileW: null,      tileH: null },
 };
 
+function requirePlotterContentBounds(file) {
+  if (!file.plotterContentBounds) {
+    throw new Error('No se pudo medir el contenido del Plotter antes de exportarlo.');
+  }
+  return file.plotterContentBounds;
+}
+
 // ── Hot reload en desarrollo ──────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'development') {
   try {
@@ -96,8 +114,10 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // ── Ventana principal ─────────────────────────────────────────────────────────
+let mainWindow = null;
+
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width:     1100,
     height:    720,
     minWidth:  820,
@@ -111,8 +131,9 @@ function createWindow() {
   });
 
   const startPage = isSessionValid() ? 'renderer/index.html' : 'renderer/login.html';
-  win.loadFile(path.join(__dirname, startPage));
-  // win.webContents.openDevTools();
+  mainWindow.loadFile(path.join(__dirname, startPage));
+  mainWindow.on('closed', () => { mainWindow = null; });
+  // mainWindow.webContents.openDevTools();
 }
 
 app.whenReady().then(() => {
@@ -228,7 +249,7 @@ ipcMain.handle('batch-tile', async (event, { files, outputFolder, options, batch
         const outputPath  = path.join(destFolders[fmt], pdfFileName);
         if (!skipIfExists || !fs.existsSync(outputPath)) {
           const srcBuf  = await fs.promises.readFile(file.path);
-          const outBuf  = await normalizePlotterPdf(srcBuf);
+          const outBuf  = await normalizePlotterPdf(srcBuf, requirePlotterContentBounds(file));
           await fs.promises.writeFile(outputPath, outBuf);
         }
         event.sender.send('tile-progress', {
@@ -400,20 +421,27 @@ function parseFileNameWithFormat(baseName) {
 // ── Credenciales API (hardcodeadas para uso interno) ─────────────────────────
 const API_URL     = 'http://134.199.211.158:3002/api';
 const CREDENTIALS = { email: 'facilmoldes@gmail.com', password: 'MoldesFacil.123' };
-let   _cachedToken = null;
+let   _cachedToken  = null;
+let   _loginPromise = null;
 
 async function getValidToken() {
-  if (!_cachedToken) {
-    const res  = await fetch(`${API_URL}/auth/login`, {
+  if (_cachedToken) return _cachedToken;
+  // Si ya hay un login en curso, esperar ese mismo en vez de lanzar otro
+  if (!_loginPromise) {
+    _loginPromise = fetch(`${API_URL}/auth/login`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(CREDENTIALS),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(`Login fallido: ${data.message}`);
-    _cachedToken = data.access_token;
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(`Login fallido: ${data.message}`);
+        _cachedToken = data.access_token;
+        return _cachedToken;
+      })
+      .finally(() => { _loginPromise = null; });
   }
-  return _cachedToken;
+  return _loginPromise;
 }
 
 // ── IPC: Subir PDFs directo a DigitalOcean + asociar en la API ───────────────
@@ -431,9 +459,12 @@ ipcMain.handle('upload-pdfs-to-site', async (event, { files }) => {
 
       const { code, talla, tipo } = parsed;
 
-      // Subir a DigitalOcean Spaces
+      // La regla del sitio es invariable: en Plotter, 90 cm siempre es el ancho.
       const key    = `pdfs/${code}-${talla}-${tipo}-${Date.now()}.pdf`;
-      const buffer = Buffer.from(file.buffer);
+      const sourceBuffer = Buffer.from(file.buffer);
+      const buffer = tipo === 'plotter'
+        ? await normalizePlotterPdf(sourceBuffer, requirePlotterContentBounds(file))
+        : sourceBuffer;
 
       await s3.send(new PutObjectCommand({
         Bucket:      'moldes-facil',
@@ -460,8 +491,9 @@ ipcMain.handle('upload-pdfs-to-site', async (event, { files }) => {
       });
 
       if (response.status === 401) {
-        _cachedToken = null;
-        token        = await getValidToken();
+        _cachedToken  = null;
+        _loginPromise = null;
+        token         = await getValidToken();
         response     = await fetch(`${API_URL}/molds/upload-pdf`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -491,6 +523,10 @@ ipcMain.handle('upload-pdfs-to-site', async (event, { files }) => {
 ipcMain.handle('process-and-upload', async (event, { files, formats }) => {
   console.log('[upload] handler iniciado, files:', files?.length);
   try {
+    // Pre-calentar el token antes de lanzar las tareas paralelas,
+    // así _cachedToken ya está listo y ningún worker dispara un login concurrente.
+    await getValidToken();
+
     const pool       = getPool();
     const formatList = (formats && formats.length) ? formats : ['a4'];
     const FORMAT_OPTS = {
@@ -515,7 +551,7 @@ ipcMain.handle('process-and-upload', async (event, { files, formats }) => {
         console.log('[debug] procesando archivo:', file.name, 'formato:', fmt);
         if (fmt === 'plotter') {
           const srcBuf = await fs.promises.readFile(file.path);
-          pdfBuffer = await normalizePlotterPdf(srcBuf);
+          pdfBuffer = await normalizePlotterPdf(srcBuf, requirePlotterContentBounds(file));
         } else {
           const paddingX   = file[`paddingX_${fmt}`] || 0;
           const paddingY   = file[`paddingY_${fmt}`] || 0;
@@ -658,4 +694,3 @@ ipcMain.handle('process-and-upload', async (event, { files, formats }) => {
     throw err;
   }
 });
-
