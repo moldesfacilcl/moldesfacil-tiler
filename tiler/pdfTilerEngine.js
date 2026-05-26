@@ -20,7 +20,9 @@ const A4_H             = 297   * PT_PER_MM;   // ≈ 841.89 pt
 const LETTER_W         = 215.9 * PT_PER_MM;   // ≈ 612.00 pt
 const LETTER_H         = 279.4 * PT_PER_MM;   // ≈ 791.97 pt
 const PLOTTER_WIDTH_PT = 90 * 10 * PT_PER_MM; // 90 cm en puntos ≈ 2551.18 pt
-const AXIS_TOLERANCE   = 0.28;                 // ±28 % de tolerancia al detectar el eje de 90 cm
+const AXIS_TOLERANCE   = 0.05;                 // ±5 %: admite margen de diseño/corte, no otro ancho
+const PLOTTER_BOTTOM_MARGIN_PT = 43;
+const PLOTTER_TOP_MARGIN_PT    = 10;
 
 function colIndexToLabel(index) {
   let label = '', n = index;
@@ -41,7 +43,18 @@ function colIndexToLabel(index) {
 function detectPlotterAxis(srcW, srcH) {
   const wDiff = Math.abs(srcW - PLOTTER_WIDTH_PT) / PLOTTER_WIDTH_PT;
   const hDiff = Math.abs(srcH - PLOTTER_WIDTH_PT) / PLOTTER_WIDTH_PT;
-  if (hDiff < wDiff && hDiff <= AXIS_TOLERANCE) {
+  const widthMatches  = wDiff <= AXIS_TOLERANCE;
+  const heightMatches = hDiff <= AXIS_TOLERANCE;
+
+  if (!widthMatches && !heightMatches) {
+    const widthCm  = Math.round(srcW / PT_PER_MM) / 10;
+    const heightCm = Math.round(srcH / PT_PER_MM) / 10;
+    throw new Error(
+      `Plotter inválido: uno de sus lados debe medir 90 cm (recibido: ${widthCm} x ${heightCm} cm).`
+    );
+  }
+
+  if (heightMatches && (!widthMatches || hDiff < wDiff)) {
     return { needsRotation: true,  plotterW: srcH, plotterH: srcW };
   }
   return { needsRotation: false, plotterW: srcW, plotterH: srcH };
@@ -219,10 +232,11 @@ async function tilePDF(sourceBuffer, options = {}) {
 
 /**
  * Normaliza un PDF plotter para que los 90 cm queden siempre como ancho (eje X).
- * Si el PDF ya tiene 90 cm como ancho → devuelve el buffer sin cambios.
- * Si tiene 90 cm como alto (portrait) → rota 90° CCW y devuelve el PDF corregido.
+ * Si el PDF ya tiene 90 cm como ancho -> devuelve el buffer sin cambios.
+ * Si tiene 90 cm como alto -> rota 90 grados CCW y devuelve el PDF corregido.
+ * Si ningún lado mide aproximadamente 90 cm -> rechaza el archivo.
  */
-async function normalizePlotterPdf(sourceBuffer) {
+async function normalizePlotterPdf(sourceBuffer, contentBounds = null) {
   const srcDoc = await PDFDocument.load(sourceBuffer, { ignoreEncryption: true });
   const pages  = srcDoc.getPages();
   if (!pages.length) throw new Error('PDF sin páginas');
@@ -237,17 +251,36 @@ async function normalizePlotterPdf(sourceBuffer) {
   const realH = srcH * userUnit;
 
   const { needsRotation } = detectPlotterAxis(realW, realH);
-  if (!needsRotation) return sourceBuffer; // ya está correcto
+  const normalizedHeight = needsRotation ? realW : realH;
+  let outputHeight = normalizedHeight;
+  let contentOffsetY = 0;
 
-  // Rotar 90° CCW: realH (90 cm) pasa a ser el ancho, realW (largo) el alto
+  if (contentBounds) {
+    const contentBottom = Math.max(0, Number(contentBounds.bottomPt));
+    const contentTop = Math.min(normalizedHeight, Number(contentBounds.topPt));
+    if (Number.isFinite(contentBottom) && Number.isFinite(contentTop) && contentTop > contentBottom) {
+      outputHeight = contentTop - contentBottom + PLOTTER_BOTTOM_MARGIN_PT + PLOTTER_TOP_MARGIN_PT;
+      contentOffsetY = PLOTTER_BOTTOM_MARGIN_PT - contentBottom;
+    }
+  }
+
+  if (!needsRotation) {
+    if (outputHeight === normalizedHeight) return sourceBuffer; // ya esta correcto
+    if (contentOffsetY !== 0) pages[0].translateContent(0, contentOffsetY);
+    pages[0].setMediaBox(0, 0, realW, outputHeight);
+    const croppedBytes = await srcDoc.save({ useObjectStreams: true });
+    return Buffer.from(croppedBytes);
+  }
+
+  // Construir una pagina normalizada conservando el contenido vectorial original.
   const outDoc = await PDFDocument.create();
   const [embedded] = await outDoc.embedPdf(sourceBuffer, [0]);
 
-  // Nueva página: ancho = realH (90 cm), alto = realW (largo del molde)
-  const newPage = outDoc.addPage([realH, realW]);
+  // realH (90 cm) pasa a ser el ancho; el recorte solo ajusta el eje vertical.
+  const newPage = outDoc.addPage([realH, outputHeight]);
   newPage.drawPage(embedded, {
-    x:      realH,   // ancla de rotación CCW
-    y:      0,
+    x:      realH,
+    y:      contentOffsetY,
     width:  realW,
     height: realH,
     rotate: degrees(90),
@@ -257,4 +290,15 @@ async function normalizePlotterPdf(sourceBuffer) {
   return Buffer.from(pdfBytes);
 }
 
-module.exports = { tilePDF, detectDimensions, normalizePlotterPdf, A4_W, A4_H, LETTER_W, LETTER_H, PT_PER_MM };
+module.exports = {
+  tilePDF,
+  detectDimensions,
+  normalizePlotterPdf,
+  A4_W,
+  A4_H,
+  LETTER_W,
+  LETTER_H,
+  PT_PER_MM,
+  PLOTTER_BOTTOM_MARGIN_PT,
+  PLOTTER_TOP_MARGIN_PT,
+};

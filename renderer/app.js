@@ -282,6 +282,7 @@ async function addPathsToList(paths) {
         totalTiles: dim.totalTiles,
         pageCount:  dim.pageCount,
         sourceSize: dim.sourceSize,
+        needsRotation: dim.needsRotation,
       });
     } else {
       Object.assign(entry, { status: 'error', error: dim.error });
@@ -585,18 +586,6 @@ async function runBatch(filesToProcess) {
   progressFill.style.width = '0%';
   progressLabel.textContent = 'Iniciando…';
 
-  const PT_PER_MM = 72 / 25.4;
-
-  // Cada archivo lleva sus paddings independientes por formato (en puntos PDF)
-  const files = filesToProcess.map(f => ({
-    path:            f.path,
-    name:            f.name,
-    paddingX_a4:     (f.paddingX_a4     || 0) * PT_PER_MM,
-    paddingY_a4:     (f.paddingY_a4     || 0) * PT_PER_MM,
-    paddingX_letter: (f.paddingX_letter || 0) * PT_PER_MM,
-    paddingY_letter: (f.paddingY_letter || 0) * PT_PER_MM,
-  }));
-
   // Formatos seleccionados
   const formats = [];
   if (chkFormatA4.checked)      formats.push('a4');
@@ -631,6 +620,21 @@ async function runBatch(filesToProcess) {
   });
 
   try {
+    if (formats.includes('plotter')) {
+      progressLabel.textContent = 'Midiendo contenido para recortar Plotter...';
+      await preparePlotterContentBounds(filesToProcess);
+    }
+
+    const files = filesToProcess.map(f => ({
+      path:                 f.path,
+      name:                 f.name,
+      paddingX_a4:          (f.paddingX_a4     || 0) * PT_PER_MM_PREVIEW,
+      paddingY_a4:          (f.paddingY_a4     || 0) * PT_PER_MM_PREVIEW,
+      paddingX_letter:      (f.paddingX_letter || 0) * PT_PER_MM_PREVIEW,
+      paddingY_letter:      (f.paddingY_letter || 0) * PT_PER_MM_PREVIEW,
+      plotterContentBounds: f.plotterContentBounds || null,
+    }));
+
     const chkSkip = document.getElementById('chkSkipExisting');
     const results = await window.tilerAPI.batchTile({
       files,
@@ -1086,6 +1090,42 @@ async function renderPDFtoCanvas(arrayBuffer, canvas, scale) {
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvasContext: ctx, viewport: vp }).promise;
+}
+
+/**
+ * Mide el contenido visible del Plotter ya orientado.
+ * La pagina final conserva 43 pt abajo y como maximo 10 pt arriba.
+ */
+async function preparePlotterContentBounds(files) {
+  for (const file of files) {
+    if (file.plotterContentBounds) continue;
+
+    const arrayBuffer = await window.tilerAPI.readPdfForPreview(file.path);
+    const maxSourcePt = Math.max(file.widthMm, file.heightMm) * PT_PER_MM_PREVIEW;
+    const scale = Math.min(1, 6000 / maxSourcePt);
+    const canvas = document.createElement('canvas');
+    await renderPDFtoCanvas(arrayBuffer, canvas, scale);
+
+    const { data, width, height } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    let minX = width, minY = height, maxX = -1, maxY = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        if (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    if (maxX < 0) throw new Error(`No se encontro contenido visible en ${file.name}.`);
+
+    const sourceHeightPt = file.heightMm * PT_PER_MM_PREVIEW;
+    file.plotterContentBounds = file.needsRotation
+      ? { bottomPt: minX / scale, topPt: (maxX + 1) / scale }
+      : { bottomPt: sourceHeightPt - (maxY + 1) / scale, topPt: sourceHeightPt - minY / scale };
+  }
 }
 
 /**
@@ -1713,16 +1753,27 @@ btnUploadToSite?.addEventListener('click', async () => {
   }
 
   btnUploadToSite.disabled = true;
-  uploadStatus.textContent = '⬆️ Procesando y subiendo...';
+  uploadStatus.textContent = formats.includes('plotter')
+    ? 'Midiendo contenido y recortando Plotter...'
+    : 'Procesando y subiendo...';
+
+  try {
+    if (formats.includes('plotter')) await preparePlotterContentBounds(state.files);
+  } catch (err) {
+    btnUploadToSite.disabled = false;
+    uploadStatus.textContent = 'Error al medir Plotter: ' + err.message;
+    return;
+  }
 
   const result = await window.tilerAPI.processAndUpload({
-    files:   state.files.map(f => ({
+    files: state.files.map(f => ({
       name:            f.name,
       path:            f.path,
       paddingX_a4:     f.paddingX_a4     || 0,
       paddingY_a4:     f.paddingY_a4     || 0,
       paddingX_letter: f.paddingX_letter || 0,
       paddingY_letter: f.paddingY_letter || 0,
+      plotterContentBounds: f.plotterContentBounds || null,
     })),
     formats,
   });
@@ -1805,6 +1856,15 @@ btnRetryErrors.addEventListener('click', async () => {
   btnUploadToSite.disabled = true;
   uploadStatus.textContent = `🔁 Reintentando ${filesToRetry.length} archivo(s)…`;
 
+  try {
+    if (formats.includes('plotter')) await preparePlotterContentBounds(filesToRetry);
+  } catch (err) {
+    btnRetryErrors.disabled = false;
+    btnUploadToSite.disabled = false;
+    uploadStatus.textContent = 'Error al medir Plotter: ' + err.message;
+    return;
+  }
+
   const result = await window.tilerAPI.processAndUpload({
     files: filesToRetry.map(f => ({
       name:            f.name,
@@ -1813,6 +1873,7 @@ btnRetryErrors.addEventListener('click', async () => {
       paddingY_a4:     f.paddingY_a4     || 0,
       paddingX_letter: f.paddingX_letter || 0,
       paddingY_letter: f.paddingY_letter || 0,
+      plotterContentBounds: f.plotterContentBounds || null,
     })),
     formats,
   });
@@ -1939,4 +2000,3 @@ if (historyPanel) {
 function refreshHistoryIfOpen() {
   if (historyPanel?.open) loadAndRenderHistory();
 }
-
