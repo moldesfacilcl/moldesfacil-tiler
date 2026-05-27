@@ -3,6 +3,15 @@
  * Moldes Fácil Tiler
  */
 
+// En macOS, crear worker_threads genera SIGCHLD que puede interrumpir un
+// readFileSync en el proceso principal con EINTR. Lo atrapamos aquí para
+// que no tire abajo toda la app — el worker se reintentará en el próximo uso.
+process.on('uncaughtException', (err) => {
+  if (err.code === 'EINTR') return; // señal del SO, no es un error real
+  console.error('[uncaughtException]', err);
+  dialog.showErrorBox('Error inesperado', err.message || String(err));
+});
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path       = require('path');
 const fs         = require('fs');
@@ -32,7 +41,7 @@ const s3 = new S3Client({
 });
 
 // ── Autenticación local ───────────────────────────────────────────────────────
-const ACCESS_EMAIL  = 'info@moldesfacil.cl';
+const ACCESS_EMAIL  = 'info@moldesfacil.com';
 const ACCESS_HASH   = crypto.createHash('sha256').update('MoldesFacil2026').digest('hex');
 const SESSION_TTL   = 30 * 24 * 60 * 60 * 1000; // 30 días
 
@@ -138,6 +147,9 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+  // Pre-inicializar el pool de workers 2 s después del arranque, cuando el
+  // proceso principal ya terminó de cargar módulos y no hay riesgo de EINTR.
+  setTimeout(() => getPool(), 2000);
   // Intentar vaciar la cola offline de Sheets al arrancar (espera 4 s para que la red esté lista)
   setTimeout(() => flushPendingQueue().catch(() => {}), 4000);
   // Reintentar cada 5 minutos por si se recupera la conexión
@@ -308,7 +320,7 @@ ipcMain.handle('batch-tile', async (event, { files, outputFolder, options, batch
 
 // ── IPC: Leer PDF para previsualización (devuelve ArrayBuffer) ────────────────
 ipcMain.handle('read-pdf-for-preview', async (_event, filePath) => {
-  const buf = fs.readFileSync(filePath);
+  const buf = await fs.promises.readFile(filePath);
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 });
 
@@ -325,15 +337,16 @@ ipcMain.handle('validate-codes', async (_event, items) => {
       if (!res.ok) { results[key] = null; continue; }
       const data = await res.json();
       const arr  = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
-      const mold = arr.find(m => String(m.code).toLowerCase() === code.toLowerCase());
+      const mold = arr.find(m => _norm(m.code) === _norm(code));
       if (!mold) {
         results[key] = { codeExists: false, tallaExists: null, availableSizes: [] };
       } else {
-        const sizes      = Array.isArray(mold.sizes) ? mold.sizes : [];
-        const tallaExists = talla
-          ? sizes.some(s => String(s).toLowerCase() === String(talla).toLowerCase())
-          : true;
-        results[key] = { codeExists: true, tallaExists, availableSizes: sizes };
+        const sizes          = Array.isArray(mold.sizes) ? mold.sizes : [];
+        const canonicalTalla = talla
+          ? (sizes.find(s => _normMatch(s) === _normMatch(talla)) ?? null)
+          : null;
+        const tallaExists    = talla ? canonicalTalla !== null : true;
+        results[key] = { codeExists: true, tallaExists, availableSizes: sizes, canonicalTalla };
       }
     } catch { results[key] = null; }
   }
@@ -418,8 +431,55 @@ function parseFileNameWithFormat(baseName) {
   return null;
 }
 
+// ── Resolución de talla canónica ─────────────────────────────────────────────
+// Consulta la API y devuelve el valor exacto de la talla como está en el catálogo.
+// Lanza Error si el código no existe o si la talla no está disponible para ese molde.
+const _norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+// Variantes de género/acento que el catálogo registra en masculino.
+// Clave: valor normalizado (sin tildes, minúsculas) de la variante del archivo.
+// Valor: forma normalizada equivalente del catálogo.
+const TALLA_GENDER_MAP = {
+  'unica':   'unico',   // "unica" / "única"  → "Único"
+  'pequena': 'pequeno', // "pequeña"          → "Pequeño"
+  'mediana': 'mediano', // "mediana"          → "Mediano"
+  'adulta':  'adulto',  // "adulta"           → "ADULTO"
+  'nina':    'nino',    // "niña"             → "NIÑO"
+  'grande':  'grande',  // sin cambio, pero explícito
+};
+
+// Normaliza para comparación: quita tildes, minúsculas, y aplica mapa de género.
+const _normMatch = s => {
+  const base = _norm(s);
+  return TALLA_GENDER_MAP[base] ?? base;
+};
+
+const _tallaCache = new Map(); // evita llamadas repetidas dentro del mismo batch
+
+async function resolveCanonicalTalla(code, rawTalla) {
+  const cacheKey = `${code}__${_normMatch(rawTalla)}`;
+  if (_tallaCache.has(cacheKey)) return _tallaCache.get(cacheKey);
+
+  const res = await fetch(`${API_URL}/molds?search=${encodeURIComponent(code)}&itemsPerPage=15`);
+  if (!res.ok) throw new Error(`API no disponible al verificar código ${code}`);
+  const data = await res.json();
+  const arr  = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+  const mold = arr.find(m => _norm(m.code) === _norm(code));
+  if (!mold) throw new Error(`Código ${code} no existe en el catálogo`);
+
+  const sizes = Array.isArray(mold.sizes) ? mold.sizes : [];
+  const canonical = sizes.find(s => _normMatch(s) === _normMatch(rawTalla));
+  if (!canonical) {
+    const available = sizes.join(', ') || '(sin tallas)';
+    throw new Error(`Talla "${rawTalla}" no disponible para ${code}. Disponibles: ${available}`);
+  }
+
+  _tallaCache.set(cacheKey, canonical);
+  return canonical;
+}
+
 // ── Credenciales API (hardcodeadas para uso interno) ─────────────────────────
-const API_URL     = 'http://134.199.211.158:3002/api';
+const API_URL     = 'https://api.moldesfacil.com/api';
 const CREDENTIALS = { email: 'facilmoldes@gmail.com', password: 'MoldesFacil.123' };
 let   _cachedToken  = null;
 let   _loginPromise = null;
@@ -457,7 +517,8 @@ ipcMain.handle('upload-pdfs-to-site', async (event, { files }) => {
         continue;
       }
 
-      const { code, talla, tipo } = parsed;
+      const { code, tipo } = parsed;
+      const talla = await resolveCanonicalTalla(code, parsed.talla);
 
       // La regla del sitio es invariable: en Plotter, 90 cm siempre es el ancho.
       const key    = `pdfs/${code}-${talla}-${tipo}-${Date.now()}.pdf`;
@@ -622,11 +683,10 @@ ipcMain.handle('process-and-upload', async (event, { files, formats }) => {
     }
 
     // ── Construir lista de todas las tareas ───────────────────────────────────
+    _tallaCache.clear(); // resetear caché por batch
     const tasks = [];
     for (const file of files) {
       const parsed = parseFileName(file.name.replace(/\.pdf$/i, ''));
-      // Siempre usar nombre canónico en la salida: "T-{talla} molde {code}"
-      const baseName = parsed ? normalizeOutputName(parsed.code, parsed.talla) : file.name.replace(/\.pdf$/i, '');
       if (!parsed) {
         for (const fmt of formatList) {
           results.errors.push({ name: file.name, error: 'Nombre no reconocido' });
@@ -636,7 +696,20 @@ ipcMain.handle('process-and-upload', async (event, { files, formats }) => {
         }
         continue;
       }
-      const { code, talla } = parsed;
+      const { code } = parsed;
+      let talla;
+      try {
+        talla = await resolveCanonicalTalla(code, parsed.talla);
+      } catch (err) {
+        for (const fmt of formatList) {
+          results.errors.push({ name: file.name, error: err.message });
+          event.sender.send('upload-progress', { name: file.name, status: 'error', error: err.message });
+          done++;
+          event.sender.send('process-upload-progress', { current: done, total, name: file.name, status: 'error' });
+        }
+        continue;
+      }
+      const baseName = normalizeOutputName(code, talla);
       for (const fmt of formatList) {
         tasks.push({ file, fmt, baseName, code, talla });
       }

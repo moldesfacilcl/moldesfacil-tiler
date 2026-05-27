@@ -1,10 +1,12 @@
 {
   "name": "moldesfacil-tiler",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Convierte PDFs plotter a hojas A4 para impresión doméstica — Moldes Fácil",
   "main": "main.js",
   "scripts": {
     "start": "env -u ELECTRON_RUN_AS_NODE NODE_ENV=development electron .",
+    "stop": "pkill -f 'Electron.*moldesfacil-tiler' 2>/dev/null; pkill -f 'electron.*moldesfacil-tiler' 2>/dev/null; true",
+    "restart": "npm stop && env -u ELECTRON_RUN_AS_NODE NODE_ENV=development nohup electron . > /tmp/moldesfacil-dev.log 2>&1 & echo 'App lanzada. Logs: tail -f /tmp/moldesfacil-dev.log'",
     "test": "node --test test/*.test.js",
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win"
