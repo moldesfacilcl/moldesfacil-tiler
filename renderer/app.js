@@ -521,6 +521,12 @@ function removeFile(idx) {
 btnClearAll.addEventListener('click', () => {
   state.files = [];
   state.sourceFolderName = null;
+  codeValidation = {};
+  lastResults    = [];
+  sessionErrors  = [];
+  thumbFileIdx   = -1;
+  thumbCanvasEl.width = 0; thumbCanvasEl.height = 0;
+  thumbGridCvEl.width = 0; thumbGridCvEl.height = 0;
   renderTable();
   showFileSection(false);
   updateProcessButton();
@@ -1090,6 +1096,7 @@ async function renderPDFtoCanvas(arrayBuffer, canvas, scale) {
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  await pdf.destroy();
 }
 
 /**
@@ -1102,7 +1109,7 @@ async function preparePlotterContentBounds(files) {
 
     const arrayBuffer = await window.tilerAPI.readPdfForPreview(file.path);
     const maxSourcePt = Math.max(file.widthMm, file.heightMm) * PT_PER_MM_PREVIEW;
-    const scale = Math.min(1, 6000 / maxSourcePt);
+    const scale = Math.min(1, 400 / maxSourcePt);
     const canvas = document.createElement('canvas');
     await renderPDFtoCanvas(arrayBuffer, canvas, scale);
 
@@ -1119,6 +1126,7 @@ async function preparePlotterContentBounds(files) {
         }
       }
     }
+    canvas.width = 0; canvas.height = 0; // liberar buffer GPU
     if (maxX < 0) throw new Error(`No se encontro contenido visible en ${file.name}.`);
 
     const sourceHeightPt = file.heightMm * PT_PER_MM_PREVIEW;
@@ -1493,6 +1501,7 @@ async function batchAutoAdjust() {
 
         const imgData = ctx.getImageData(0, 0, comp.width, comp.height);
         const result  = computeOptimalPadding(imgData, tileWpx, tileHpx, scale, f, fmt);
+        comp.width = 0; comp.height = 0; // liberar buffer GPU
 
         if (fmt === 'a4') {
           f.paddingX_a4  = result.paddingX;
@@ -1504,6 +1513,7 @@ async function batchAutoAdjust() {
           f.adjusted_letter  = result.paddingX > 0 || result.paddingY > 0;
         }
       }
+      offCanvas.width = 0; offCanvas.height = 0; // liberar buffer GPU
       done++;
     } catch (err) {
       console.warn('batchAutoAdjust skip:', f.name, err.message);
@@ -1592,6 +1602,7 @@ async function renderPlotterThumb() {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(thumbOfsX, thumbOfsY, offCv.width, offCv.height);
     ctx.drawImage(offCv, thumbOfsX, thumbOfsY);
+    offCv.width = 0; offCv.height = 0; // liberar buffer GPU
 
     thumbCanvasEl.style.display = 'block';
     redrawThumbGrid();
@@ -1866,15 +1877,20 @@ btnRetryErrors.addEventListener('click', async () => {
   }
 
   const result = await window.tilerAPI.processAndUpload({
-    files: filesToRetry.map(f => ({
-      name:            f.name,
-      path:            f.path,
-      paddingX_a4:     f.paddingX_a4     || 0,
-      paddingY_a4:     f.paddingY_a4     || 0,
-      paddingX_letter: f.paddingX_letter || 0,
-      paddingY_letter: f.paddingY_letter || 0,
-      plotterContentBounds: f.plotterContentBounds || null,
-    })),
+    files: filesToRetry.map(f => {
+      const valKey = `${f.parsedCode}__${f.parsedTalla}`;
+      const val    = codeValidation[valKey];
+      return {
+        name:            f.name,
+        path:            f.path,
+        paddingX_a4:     f.paddingX_a4     || 0,
+        paddingY_a4:     f.paddingY_a4     || 0,
+        paddingX_letter: f.paddingX_letter || 0,
+        paddingY_letter: f.paddingY_letter || 0,
+        plotterContentBounds: f.plotterContentBounds || null,
+        canonicalTalla:  val?.canonicalTalla || null,
+      };
+    }),
     formats,
   });
 
