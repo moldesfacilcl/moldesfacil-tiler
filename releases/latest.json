@@ -1,6 +1,6 @@
 {
-  "version": "1.1.1",
-  "mac_arm64": "https://moldes-facil.sfo3.cdn.digitaloceanspaces.com/releases/tiler/Moldes%20F%C3%A1cil%20Tiler-1.1.1-arm64.dmg",
-  "mac_x64":   "https://moldes-facil.sfo3.cdn.digitaloceanspaces.com/releases/tiler/Moldes%20F%C3%A1cil%20Tiler-1.1.1.dmg",
-  "win_x64":   "https://moldes-facil.sfo3.cdn.digitaloceanspaces.com/releases/tiler/Moldes%20F%C3%A1cil%20Tiler%20Setup%201.1.1.exe"
+  "version": "1.1.2",
+  "mac_arm64": "https://moldes-facil.sfo3.cdn.digitaloceanspaces.com/releases/tiler/Moldes%20F%C3%A1cil%20Tiler-1.1.2-arm64.dmg",
+  "mac_x64":   "https://moldes-facil.sfo3.cdn.digitaloceanspaces.com/releases/tiler/Moldes%20F%C3%A1cil%20Tiler-1.1.2.dmg",
+  "win_x64":   "https://moldes-facil.sfo3.cdn.digitaloceanspaces.com/releases/tiler/Moldes%20F%C3%A1cil%20Tiler%20Setup%201.1.2.exe"
 }
