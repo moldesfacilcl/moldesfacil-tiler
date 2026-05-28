@@ -336,7 +336,7 @@ ipcMain.handle('validate-codes', async (_event, items) => {
       const res  = await fetch(`${API_URL}/molds?search=${encodeURIComponent(code)}&itemsPerPage=15`);
       if (!res.ok) { results[key] = null; continue; }
       const data = await res.json();
-      const arr  = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+      const arr  = Array.isArray(data) ? data : (Array.isArray(data?.result) ? data.result : (Array.isArray(data?.data) ? data.data : []));
       const mold = arr.find(m => _norm(m.code) === _norm(code));
       if (!mold) {
         results[key] = { codeExists: false, tallaExists: null, availableSizes: [] };
@@ -463,7 +463,7 @@ async function resolveCanonicalTalla(code, rawTalla) {
   const res = await fetch(`${API_URL}/molds?search=${encodeURIComponent(code)}&itemsPerPage=15`);
   if (!res.ok) throw new Error(`API no disponible al verificar código ${code}`);
   const data = await res.json();
-  const arr  = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+  const arr  = Array.isArray(data) ? data : (Array.isArray(data?.result) ? data.result : (Array.isArray(data?.data) ? data.data : []));
   const mold = arr.find(m => _norm(m.code) === _norm(code));
   if (!mold) throw new Error(`Código ${code} no existe en el catálogo`);
 
