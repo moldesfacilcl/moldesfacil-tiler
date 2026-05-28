@@ -12,7 +12,7 @@ process.on('uncaughtException', (err) => {
   dialog.showErrorBox('Error inesperado', err.message || String(err));
 });
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path       = require('path');
 const fs         = require('fs');
 const os         = require('os');
@@ -122,6 +122,43 @@ if (process.env.NODE_ENV === 'development') {
   } catch (e) { /* electron-reload no instalado aún */ }
 }
 
+// ── Verificación de actualizaciones ──────────────────────────────────────────
+const LATEST_JSON_URL = 'https://moldes-facil.sfo3.cdn.digitaloceanspaces.com/releases/tiler/latest.json';
+
+function isNewerVersion(latest, current) {
+  const l = latest.split('.').map(Number);
+  const c = current.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((l[i] || 0) > (c[i] || 0)) return true;
+    if ((l[i] || 0) < (c[i] || 0)) return false;
+  }
+  return false;
+}
+
+async function checkForUpdate(win) {
+  try {
+    const res = await fetch(LATEST_JSON_URL);
+    if (!res.ok) return;
+    const latest = await res.json();
+    const current = app.getVersion();
+    if (!isNewerVersion(latest.version, current)) return;
+    const url = process.platform === 'win32' ? latest.win_x64
+              : process.arch === 'arm64'      ? latest.mac_arm64
+              :                                 latest.mac_x64;
+    const { response } = await dialog.showMessageBox(win, {
+      type:      'info',
+      title:     'Actualización disponible',
+      message:   `Nueva versión ${latest.version} disponible`,
+      detail:    `Versión actual: ${current}\nDescarga la nueva versión para acceder a las últimas mejoras.`,
+      buttons:   ['Descargar ahora', 'Más tarde'],
+      defaultId: 0,
+    });
+    if (response === 0) shell.openExternal(url);
+  } catch (e) {
+    console.log('[update-check] sin conexión o error:', e.message);
+  }
+}
+
 // ── Ventana principal ─────────────────────────────────────────────────────────
 let mainWindow = null;
 
@@ -141,6 +178,9 @@ function createWindow() {
 
   const startPage = isSessionValid() ? 'renderer/index.html' : 'renderer/login.html';
   mainWindow.loadFile(path.join(__dirname, startPage));
+  mainWindow.webContents.on('did-finish-load', () => {
+    checkForUpdate(mainWindow).catch(() => {});
+  });
   mainWindow.on('closed', () => { mainWindow = null; });
   // mainWindow.webContents.openDevTools();
 }
