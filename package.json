@@ -32,8 +32,11 @@
       "renderer/**/*",
       "tiler/**/*"
     ],
+    "afterPack": "./scripts/after-pack.js",
     "mac": {
       "category": "public.app-category.productivity",
+      "hardenedRuntime": false,
+      "identity": null,
       "target": [
         {
           "target": "dmg",
