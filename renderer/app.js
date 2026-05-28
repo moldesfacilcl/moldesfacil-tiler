@@ -8,7 +8,7 @@
 // ── Parser de nombres (espejo del que está en main.js) ───────────────────────
 function parseFileName(baseName) {
   const name = baseName.replace(/^[._\s]+/, '').trim();
-  let m = name.match(/^([^\s]+)\s+molde\s+([^\s]+)$/i);
+  let m = name.match(/^([^\s]+)\s+moldes?\s+([^\s]+)$/i);
   if (m) {
     const tallaRaw = m[1];
     return { code: m[2], talla: tallaRaw.startsWith('T-') ? tallaRaw.slice(2) : tallaRaw };

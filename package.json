@@ -1,6 +1,6 @@
 {
   "name": "moldesfacil-tiler",
-  "version": "1.1.2",
+  "version": "1.1.4",
   "description": "Convierte PDFs plotter a hojas A4 para impresión doméstica — Moldes Fácil",
   "main": "main.js",
   "scripts": {
@@ -13,13 +13,15 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1050.0",
+    "es-errors": "^1.3.0",
     "googleapis": "^172.0.0",
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "electron": "^28.3.3",
     "electron-builder": "^26.0.12",
-    "electron-reload": "^2.0.0-alpha.1"
+    "electron-reload": "^2.0.0-alpha.1",
+    "jiti": "^2.4.2"
   },
   "build": {
     "appId": "cl.moldesfacil.tiler",

@@ -17,6 +17,7 @@ const path       = require('path');
 const fs         = require('fs');
 const os         = require('os');
 const crypto     = require('crypto');
+const https      = require('https');
 const WorkerPool = require('./tiler/workerPool');
 const { A4_W, A4_H, LETTER_W, LETTER_H, normalizePlotterPdf } = require('./tiler/pdfTilerEngine');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
@@ -135,6 +136,32 @@ function isNewerVersion(latest, current) {
   return false;
 }
 
+function downloadFile(url, destPath, onProgress) {
+  return new Promise((resolve, reject) => {
+    function get(u) {
+      https.get(u, (res) => {
+        if (res.statusCode >= 301 && res.statusCode <= 308 && res.headers.location) {
+          return get(res.headers.location);
+        }
+        if (res.statusCode !== 200) {
+          return reject(new Error(`HTTP ${res.statusCode}`));
+        }
+        const total = parseInt(res.headers['content-length'], 10) || 0;
+        let downloaded = 0;
+        const file = fs.createWriteStream(destPath);
+        res.on('data', (chunk) => {
+          downloaded += chunk.length;
+          if (total > 0) onProgress(downloaded / total);
+        });
+        res.pipe(file);
+        file.on('finish', () => file.close(resolve));
+        file.on('error', (err) => { fs.unlink(destPath, () => {}); reject(err); });
+      }).on('error', reject);
+    }
+    get(url);
+  });
+}
+
 async function checkForUpdate(win) {
   try {
     const res = await fetch(LATEST_JSON_URL);
@@ -149,11 +176,24 @@ async function checkForUpdate(win) {
       type:      'info',
       title:     'Actualización disponible',
       message:   `Nueva versión ${latest.version} disponible`,
-      detail:    `Versión actual: ${current}\nDescarga la nueva versión para acceder a las últimas mejoras.`,
-      buttons:   ['Descargar ahora', 'Más tarde'],
+      detail:    `Versión actual: ${current}\nLa actualización se descargará e instalará automáticamente.`,
+      buttons:   ['Actualizar ahora', 'Más tarde'],
       defaultId: 0,
     });
-    if (response === 0) shell.openExternal(url);
+    if (response !== 0) return;
+
+    const ext     = process.platform === 'win32' ? '.exe' : '.dmg';
+    const tmpFile = path.join(os.tmpdir(), `MoldesFacilTilerSetup-${latest.version}${ext}`);
+    win.setProgressBar(2); // indeterminado mientras inicia la descarga
+    try {
+      await downloadFile(url, tmpFile, (p) => win.setProgressBar(p));
+      win.setProgressBar(-1);
+      await shell.openPath(tmpFile);
+      setTimeout(() => app.quit(), 1500);
+    } catch (dlErr) {
+      win.setProgressBar(-1);
+      dialog.showErrorBox('Error de descarga', `No se pudo descargar la actualización:\n${dlErr.message}`);
+    }
   } catch (e) {
     console.log('[update-check] sin conexión o error:', e.message);
   }
@@ -436,13 +476,13 @@ ipcMain.handle('open-folder', async (_event, folderPath) => {
 //   "._576A TALLA 14"   → { code: '576A', talla: '14' } (limpia el prefijo)
 function parseFileName(baseName) {
   const name = baseName.replace(/^[._\s]+/, '').trim();
-  // Formato: {talla_prefijo} molde {code}
-  let m = name.match(/^([^\s]+)\s+molde\s+([^\s]+)$/i);
+  // Formato: {talla_prefijo} molde(s) {code}
+  let m = name.match(/^([^\s]+)\s+moldes?\s+([^\s]+)$/i);
   if (m) {
     const tallaRaw = m[1];
     return { code: m[2], talla: tallaRaw.startsWith('T-') ? tallaRaw.slice(2) : tallaRaw };
   }
-  // Formato: {code} TALLA {talla}  (el código puede ir precedido de cualquier cosa tras limpiar)
+  // Formato: {code} TALLA {talla}
   m = name.match(/^([A-Za-z0-9]+)\s+TALLA\s+([A-Za-z0-9]+)/i);
   if (m) return { code: m[1], talla: m[2] };
   return null;
@@ -456,11 +496,11 @@ function normalizeOutputName(code, talla) {
 // Igual pero con sufijo de formato al final (para archivos ya tileados)
 function parseFileNameWithFormat(baseName) {
   const name = baseName.replace(/^[._\s]+/, '').trim();
-  // Formato canónico de salida: T-{talla} molde {code} {A4|Carta|Plotter}
-  let m = name.match(/^T-([^\s]+)\s+molde\s+([^\s]+)\s+(A4|Carta|Plotter)$/i);
+  // Formato canónico de salida: T-{talla} molde(s) {code} {A4|Carta|Plotter}
+  let m = name.match(/^T-([^\s]+)\s+moldes?\s+([^\s]+)\s+(A4|Carta|Plotter)$/i);
   if (m) return { code: m[2], talla: m[1], tipo: m[3] === 'A4' ? 'A4' : m[3].toLowerCase() };
-  // Formato: {talla_prefijo} molde {code} {formato}
-  m = name.match(/^([^\s]+)\s+molde\s+([^\s]+)\s+(A4|Carta|Plotter)$/i);
+  // Formato: {talla_prefijo} molde(s) {code} {formato}
+  m = name.match(/^([^\s]+)\s+moldes?\s+([^\s]+)\s+(A4|Carta|Plotter)$/i);
   if (m) {
     const tallaRaw = m[1];
     return { code: m[2], talla: tallaRaw.startsWith('T-') ? tallaRaw.slice(2) : tallaRaw, tipo: m[3] === 'A4' ? 'A4' : m[3].toLowerCase() };
