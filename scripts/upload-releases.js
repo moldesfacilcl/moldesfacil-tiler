@@ -15,11 +15,10 @@ const s3 = new S3Client({
 const BUCKET = 'moldes-facil';
 
 const FILES = [
-  { local: 'dist/Moldes Fácil Tiler-1.1.0.dmg',         key: 'releases/tiler/Moldes Fácil Tiler-1.1.0.dmg',       type: 'application/x-apple-diskimage' },
-  { local: 'dist/Moldes Fácil Tiler-1.1.0-arm64.dmg',   key: 'releases/tiler/Moldes Fácil Tiler-1.1.0-arm64.dmg', type: 'application/x-apple-diskimage' },
+  { local: 'dist/Moldes Fácil Tiler-1.1.1.dmg',         key: 'releases/tiler/Moldes Fácil Tiler-1.1.1.dmg',       type: 'application/x-apple-diskimage' },
+  { local: 'dist/Moldes Fácil Tiler-1.1.1-arm64.dmg',   key: 'releases/tiler/Moldes Fácil Tiler-1.1.1-arm64.dmg', type: 'application/x-apple-diskimage' },
   { local: 'releases/latest.json',                       key: 'releases/tiler/latest.json',                        type: 'application/json' },
-  // Windows: descomenta cuando tengas el .exe
-  // { local: 'dist/Moldes Fácil Tiler Setup 1.1.0.exe', key: 'releases/tiler/Moldes Fácil Tiler Setup 1.1.0.exe', type: 'application/octet-stream' },
+  { local: 'dist/Moldes Fácil Tiler Setup 1.1.1.exe',   key: 'releases/tiler/Moldes Fácil Tiler Setup 1.1.1.exe', type: 'application/octet-stream' },
 ];
 
 async function upload({ local, key, type }) {

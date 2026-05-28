@@ -32,3 +32,41 @@ jobs:
           name: MoldesFacilTiler-Windows
           path: dist/*.exe
           retention-days: 30
+
+      - name: Subir .exe a Digital Ocean Spaces
+        shell: bash
+        env:
+          DO_ACCESS_KEY: ${{ secrets.DO_ACCESS_KEY }}
+          DO_SECRET_KEY: ${{ secrets.DO_SECRET_KEY }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          EXE="dist/Moldes Fácil Tiler Setup ${VERSION}.exe"
+          if [ ! -f "$EXE" ]; then
+            echo "No se encontró el .exe: $EXE"
+            ls dist/
+            exit 1
+          fi
+          npm install -g @aws-sdk/client-s3 2>/dev/null || true
+          node -e "
+            const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+            const fs = require('fs');
+            const ver = require('./package.json').version;
+            const s3 = new S3Client({
+              endpoint: 'https://sfo3.digitaloceanspaces.com',
+              region: 'sfo3',
+              credentials: {
+                accessKeyId: process.env.DO_ACCESS_KEY,
+                secretAccessKey: process.env.DO_SECRET_KEY,
+              },
+              forcePathStyle: false,
+            });
+            const key = 'releases/tiler/Moldes Fácil Tiler Setup ' + ver + '.exe';
+            const body = fs.readFileSync('dist/Moldes Fácil Tiler Setup ' + ver + '.exe');
+            s3.send(new PutObjectCommand({
+              Bucket: 'moldes-facil',
+              Key: key,
+              Body: body,
+              ACL: 'public-read',
+              ContentType: 'application/octet-stream',
+            })).then(() => console.log('✓ Subido:', key)).catch(e => { console.error(e.message); process.exit(1); });
+          "
